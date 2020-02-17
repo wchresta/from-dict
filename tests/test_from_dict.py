@@ -1,13 +1,18 @@
-import dataclasses
 from typing import Optional, List, Type, NamedTuple
 
 import attr
 import pytest
+import sys
 
 from from_dict import from_dict, FromDictTypeError
 
+if sys.version_info >= (3, 7):
+    from dataclasses import dataclass
+else:
+    from attr import dataclass
 
-@dataclasses.dataclass
+
+@dataclass
 class Structures:
     outer_structure: Type
     inner_structure: Type
@@ -41,13 +46,13 @@ class MainTestDictAttrWithValidators:
 
 
 # Dataclass structures
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class SubTestDictDataclass:
     foo: int
     bar: str
 
 
-@dataclasses.dataclass(frozen=True)
+@dataclass(frozen=True)
 class MainTestDictDataclass:
     foo: int
     baz: SubTestDictDataclass
