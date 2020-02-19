@@ -1,4 +1,4 @@
-from typing import Optional, List, Type, NamedTuple
+from typing import Optional, List, Type, NamedTuple, Union, Dict
 
 import attr
 import pytest
@@ -6,7 +6,7 @@ import sys
 
 from from_dict import from_dict, FromDictTypeError
 
-if sys.version_info >= (3, 7):
+if sys.version_info[:2] >= (3, 7):
     from dataclasses import dataclass
 else:
     from attr import dataclass
@@ -70,13 +70,13 @@ class MainTestDictNamedTuple(NamedTuple):
 
 
 @pytest.fixture(params=[
-    pytest.param((MainTestDictAttr, SubTestDictAttr, False, True), id="attr"),
-    pytest.param((MainTestDictAttr, SubTestDictAttr, True, True), id="attr-with-validators"),
-    pytest.param((MainTestDictDataclass, SubTestDictDataclass, False, True), id="dataclass"),
-    pytest.param((MainTestDictNamedTuple, SubTestDictNamedTuple, False, False), id="named-tuple"),
+    pytest.param(Structures(MainTestDictAttr, SubTestDictAttr, False, True), id="attr"),
+    pytest.param(Structures(MainTestDictAttr, SubTestDictAttr, True, True), id="attr-with-validators"),
+    pytest.param(Structures(MainTestDictDataclass, SubTestDictDataclass, False, True), id="dataclass"),
+    pytest.param(Structures(MainTestDictNamedTuple, SubTestDictNamedTuple, False, False), id="named-tuple"),
 ])
 def structures(request):
-    yield Structures(*request.param)
+    yield request.param
 
 
 def test_packing(structures):
@@ -171,3 +171,51 @@ def test_subscripted_attr_generics_work():
     assert opt.a == 11
     assert opt.b is None
     assert opt.c == [1, 2, 3]
+    assert from_dict(KDict, a=11, b="hi", c=[1, 2, 3]).b == "hi"
+
+
+def test_list_of_structures_work(structures):
+    @attr.s(auto_attribs=True)
+    class KList:
+        a: List[structures.inner_structure]
+
+    val = {
+        "a": [
+            {"foo": 11, "bar": "Hi"},
+            {"foo": 13, "bar": "Sup"},
+            {"foo": -4, "bar": "Ya"},
+        ]
+    }
+    structs = from_dict(KList, val, fd_check_types=not structures.does_type_validation)
+
+    assert structs.a[0].foo == 11
+    assert [el.foo for el in structs.a] == [11, 13, -4]
+    assert [el.bar for el in structs.a] == ["Hi", "Sup", "Ya"]
+
+
+def test_dict_with_substructure(structures):
+    @attr.s(auto_attribs=True)
+    class SubDict:
+        a: Dict[int, structures.inner_structure]
+
+    val = {
+        "a": {
+            11: {"foo": 11, "bar": "Hi"},
+            13: {"foo": 13, "bar": "Sup"},
+            -4: {"foo": -4, "bar": "Ya"},
+        }
+    }
+    structs = from_dict(SubDict, val, fd_check_types=not structures.does_type_validation)
+    assert all(k == v.foo for k, v in structs.a.items())
+
+
+def test_union_works():
+    @attr.s(auto_attribs=True)
+    class UClass:
+        a: Union[str, int]
+
+    assert from_dict(UClass, {"a": "hello"}, fd_check_types=True).a == "hello"
+    assert from_dict(UClass, {"a": 22}, fd_check_types=True).a == 22
+
+    assert from_dict(UClass, {"a": "hello"}, fd_check_types=True).a == "hello"
+    assert from_dict(UClass, {"a": 22}, fd_check_types=True).a == 22
