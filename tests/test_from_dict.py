@@ -8,9 +8,10 @@ from from_dict import from_dict, FromDictTypeError
 
 if sys.version_info[:2] >= (3, 7):
     from dataclasses import dataclass
+    GLOBALS = None # Don't need globals()
 else:
     from attr import dataclass
-
+    GLOBALS = globals()
 
 @dataclass
 class Structures:
@@ -69,17 +70,30 @@ class MainTestDictNamedTuple(NamedTuple):
     baz: SubTestDictNamedTuple
 
 
+# Dataclass structures
+@dataclass(frozen=True)
+class MainTestDictDataclassFrwRef:
+    foo: int
+    baz: 'SubTestDictDataclassFrwRef'
+
+
+@dataclass(frozen=True)
+class SubTestDictDataclassFrwRef:
+    foo: int
+    bar: str
+
 @pytest.fixture(params=[
     pytest.param(Structures(MainTestDictAttr, SubTestDictAttr, False, True), id="attr"),
     pytest.param(Structures(MainTestDictAttr, SubTestDictAttr, True, True), id="attr-with-validators"),
     pytest.param(Structures(MainTestDictDataclass, SubTestDictDataclass, False, True), id="dataclass"),
+    pytest.param(Structures(MainTestDictDataclassFrwRef, SubTestDictDataclassFrwRef, False, True), id="dataclass-forward-ref"),
     pytest.param(Structures(MainTestDictNamedTuple, SubTestDictNamedTuple, False, False), id="named-tuple"),
 ])
 def structures(request):
     yield request.param
 
 
-def test_packing(structures):
+def test_packing(structures: Structures):
     input_dict = {
         "foo": 22,
         "baz": {
@@ -88,26 +102,26 @@ def test_packing(structures):
         }
     }
 
-    main_object = from_dict(structures.outer_structure, input_dict)
+    main_object = from_dict(structures.outer_structure, input_dict, fd_global_ns=GLOBALS)
 
     assert main_object.baz.bar == "Works :)"
     assert isinstance(main_object, structures.outer_structure)
     assert isinstance(main_object.baz, structures.inner_structure)
 
 
-def test_keyword_style(structures):
-    m = from_dict(structures.outer_structure, foo=22, baz=structures.inner_structure(foo=42, bar="Works :)"))
+def test_keyword_style(structures: Structures):
+    m = from_dict(structures.outer_structure, foo=22, baz=structures.inner_structure(foo=42, bar="Works :)"), fd_global_ns=GLOBALS)
     assert m.foo == 22
     assert m.baz.foo == 42
     assert m.baz.bar == "Works :)"
 
 
-def test_keyword_style_overwrites_positional(structures):
-    assert from_dict(structures.inner_structure, {"foo": 42, "bar": "Works :)"}, foo=0).foo == 0
+def test_keyword_style_overwrites_positional(structures: Structures):
+    assert from_dict(structures.inner_structure, {"foo": 42, "bar": "Works :)"}, foo=0, fd_global_ns=GLOBALS).foo == 0
 
 
-def test_additional_keys_are_allowed(structures):
-    my_obj = from_dict(structures.inner_structure, foo=22, bar="Works", additional=[1, 2, 3])
+def test_additional_keys_are_allowed(structures: Structures):
+    my_obj = from_dict(structures.inner_structure, foo=22, bar="Works", additional=[1, 2, 3], fd_global_ns=GLOBALS)
     assert my_obj.foo == 22
     assert my_obj.bar == "Works"
 
@@ -115,12 +129,12 @@ def test_additional_keys_are_allowed(structures):
         assert my_obj.additional == [1, 2, 3]
 
 
-def test_missing_key(structures):
+def test_missing_key(structures: Structures):
     with pytest.raises(TypeError):
         from_dict(structures.inner_structure, {"foo": 22})
 
 
-def test_invalid_type_inherent(structures):
+def test_invalid_type_inherent(structures: Structures):
     if not structures.does_type_validation:
         pytest.skip("Structure does not support inherent runtime type checking")
 
@@ -128,14 +142,14 @@ def test_invalid_type_inherent(structures):
         from_dict(structures.inner_structure, {"foo": "wrong", "bar": "right"}, fd_check_types=True)
 
 
-def test_invalid_type_from_dict(structures):
+def test_invalid_type_from_dict(structures: Structures):
     with pytest.raises(FromDictTypeError) as e:
         from_dict(structures.inner_structure, {"foo": "wrong", "bar": "right"}, fd_check_types=True)
 
     assert str(e.value) == "For \"foo\", expected <class 'int'> but found <class 'str'>"
 
 
-def test_missing_key_discovered_in_subdict_inherent(structures):
+def test_missing_key_discovered_in_subdict_inherent(structures: Structures):
     if not structures.does_type_validation:
         pytest.skip("Structure does not support inherent runtime type checking")
 
@@ -143,18 +157,18 @@ def test_missing_key_discovered_in_subdict_inherent(structures):
         from_dict(structures.outer_structure, {"foo": 22, "baz": {"foo": 42}})
 
 
-def test_invalid_type_discovered_in_subdict_from_dict(structures):
+def test_invalid_type_discovered_in_subdict_from_dict(structures: Structures):
     with pytest.raises(FromDictTypeError) as e:
         from_dict(structures.outer_structure, {"foo": 22, "baz": {"foo": 42, "bar": ["wrong type"]}},
-                  fd_check_types=True)
+                  fd_check_types=True, fd_global_ns=GLOBALS)
 
     assert str(e.value) == "For \"baz.bar\", expected <class 'str'> but found <class 'list'>"
 
 
-def test_invalid_type_discovered_in_subdict(structures):
+def test_invalid_type_discovered_in_subdict(structures: Structures):
     with pytest.raises(FromDictTypeError) as e:
         from_dict(structures.outer_structure, {"foo": 22, "baz": {"foo": 42, "bar": ["wrong type"]}},
-                  fd_check_types=True)
+                  fd_check_types=True, fd_global_ns=GLOBALS)
 
     assert str(e.value) == "For \"baz.bar\", expected <class 'str'> but found <class 'list'>"
 
@@ -174,7 +188,7 @@ def test_subscripted_attr_generics_work():
     assert from_dict(KDict, a=11, b="hi", c=[1, 2, 3]).b == "hi"
 
 
-def test_list_of_structures_work(structures):
+def test_list_of_structures_work(structures: Structures):
     @attr.s(auto_attribs=True)
     class KList:
         a: List[structures.inner_structure]
@@ -193,7 +207,7 @@ def test_list_of_structures_work(structures):
     assert [el.bar for el in structs.a] == ["Hi", "Sup", "Ya"]
 
 
-def test_dict_with_substructure(structures):
+def test_dict_with_substructure(structures: Structures):
     @attr.s(auto_attribs=True)
     class SubDict:
         a: Dict[int, structures.inner_structure]
@@ -217,5 +231,3 @@ def test_union_works():
     assert from_dict(UClass, {"a": "hello"}, fd_check_types=True).a == "hello"
     assert from_dict(UClass, {"a": 22}, fd_check_types=True).a == 22
 
-    assert from_dict(UClass, {"a": "hello"}, fd_check_types=True).a == "hello"
-    assert from_dict(UClass, {"a": 22}, fd_check_types=True).a == 22
