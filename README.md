@@ -6,6 +6,7 @@ Create data structures from dictionaries.
 * Supports nested structures when using `typing.List` and `typing.Dict` type hints.
 * Insert additional fields existing in dict into structure with `fd_copy_unknown=True`
 * Optional run-time type-checking with `fd_check_types=True`
+* Supports forward references since 0.2.1
 
 
 ## Example
