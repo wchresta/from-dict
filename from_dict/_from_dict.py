@@ -88,8 +88,19 @@ def get_constructor_type_hints(
     if cls is None:
         return None
 
-    return typing.get_type_hints(cls.__init__, global_ns, local_ns) or typing.get_type_hints(cls, global_ns, local_ns)
+    # Can't use caching if a namespace dictionary is passed in.
+    if global_ns or local_ns:
+        return typing.get_type_hints(cls.__init__, global_ns, local_ns) or typing.get_type_hints(cls, global_ns, local_ns)
 
+    return _get_constructor_type_hints(cls)
+
+
+def _get_constructor_type_hints(cls: Type) -> Mapping[str, Type]:
+    """ This is an optimized version of get_constructor_type_hints.
+        Unlike 'get_constructor_type_hints', it can be wrapped by functools.lru_cache 
+        because it does not take in dictionary objects. 
+    """
+    return typing.get_type_hints(cls.__init__) or typing.get_type_hints(cls)
 
 def resolve_str_forward_ref(
     type_or_name: Union[str, Type], 
@@ -214,16 +225,18 @@ def handle_dict_argument(
     cls_arg_type_args
 ) -> object:
     cls_argument_origin =  get_origin(cls_argument_type)
-    if ( cls_argument_origin in (dict, typing.Dict)  # in Python36, origin is Dict not dict
-        and _get_constructor_type_hints(cls_arg_type_args[1])):
-        # Dict[a,b]; we only support b being a structure.
-        key_type, value_type = cls_arg_type_args
-        if fd_check_types:  # Perform type check on keys
-            all(type_check(k, key_type) for k in given_argument.keys())
-        argument_value = {
-            k: _from_dict(value_type, v)
-            for k, v in given_argument.items()
-        }
+    if cls_argument_origin in (dict, typing.Dict):  # in Python36, origin is Dict not dict
+        if _get_constructor_type_hints(cls_arg_type_args[1]):
+            # Dict[a,b]; we only support b being a structure.
+            key_type, value_type = cls_arg_type_args
+            if fd_check_types:  # Perform type check on keys
+                all(type_check(k, key_type) for k in given_argument.keys())
+            argument_value = {
+                k: _from_dict(value_type, v)
+                for k, v in given_argument.items()
+            }
+        else:
+            argument_value = given_argument
     elif cls_argument_origin == Union:
         if (len(cls_arg_type_args) == 2 and cls_arg_type_args[1] == type(None) # Optional
             and _get_constructor_type_hints(cls_arg_type_args[0])):

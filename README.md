@@ -100,3 +100,9 @@ for res in structured_response.results:
 
 ```
 
+## internal caching
+
+There is internal caching that can be optionally enabled to help improve performance. Enabling this caching gives around a 3x improvement in speed. 
+
+When caching is enabled the package will save the initialization data for each type of object that the package parses. 
+This is beneficial for use cases where the same dataclass is parsed many times during the execution of the application. 

@@ -4,7 +4,7 @@ import attr
 import pytest
 import sys
 
-from from_dict import from_dict, FromDictTypeError
+from from_dict import from_dict, FromDictTypeError, cache_enable, cache_disable
 
 if sys.version_info[:2] >= (3, 7):
     from dataclasses import dataclass
@@ -12,6 +12,12 @@ if sys.version_info[:2] >= (3, 7):
 else:
     from attr import dataclass
     GLOBALS = globals()
+
+def set_caching(enabled: bool):
+    if enabled:
+        cache_enable()
+    else:
+        cache_disable()
 
 @dataclass
 class Structures:
@@ -92,8 +98,15 @@ class SubTestDictDataclassFrwRef:
 def structures(request):
     yield request.param
 
+@pytest.fixture(params=[
+    pytest.param(True, id="caching"),
+    pytest.param(False, id="no-caching")
+])
+def use_cache(request):
+    yield request.param
 
-def test_packing(structures: Structures):
+
+def test_packing(structures: Structures, use_cache: bool):
     input_dict = {
         "foo": 22,
         "baz": {
@@ -102,31 +115,37 @@ def test_packing(structures: Structures):
         }
     }
 
+    set_caching(use_cache)
     main_object = from_dict(structures.outer_structure, input_dict, fd_global_ns=GLOBALS)
 
     assert main_object.baz.bar == "Works :)"
     assert isinstance(main_object, structures.outer_structure)
     assert isinstance(main_object.baz, structures.inner_structure)
+    cache_disable()
 
 
-def test_keyword_style(structures: Structures):
+def test_keyword_style(structures: Structures, use_cache: bool):
+    set_caching(use_cache)
     m = from_dict(structures.outer_structure, foo=22, baz=structures.inner_structure(foo=42, bar="Works :)"), fd_global_ns=GLOBALS)
     assert m.foo == 22
     assert m.baz.foo == 42
     assert m.baz.bar == "Works :)"
+    cache_disable()
 
 
 def test_keyword_style_overwrites_positional(structures: Structures):
     assert from_dict(structures.inner_structure, {"foo": 42, "bar": "Works :)"}, foo=0, fd_global_ns=GLOBALS).foo == 0
 
 
-def test_additional_keys_are_allowed(structures: Structures):
+def test_additional_keys_are_allowed(structures: Structures, use_cache: bool):
+    set_caching(use_cache)
     my_obj = from_dict(structures.inner_structure, foo=22, bar="Works", additional=[1, 2, 3], fd_global_ns=GLOBALS)
     assert my_obj.foo == 22
     assert my_obj.bar == "Works"
 
     if structures.has_dict:
         assert my_obj.additional == [1, 2, 3]
+    cache_disable()
 
 
 def test_missing_key(structures: Structures):
@@ -179,13 +198,38 @@ def test_subscripted_attr_generics_work():
         a: int
         b: Optional[str]
         c: List[int]
+        d: Dict[str, int]
 
-    opt = from_dict(KDict, a=11, b=None, c=[1, 2, 3])
+    opt = from_dict(KDict, a=11, b=None, c=[1, 2, 3], d={"a":1, "b": 2})
 
     assert opt.a == 11
     assert opt.b is None
     assert opt.c == [1, 2, 3]
-    assert from_dict(KDict, a=11, b="hi", c=[1, 2, 3]).b == "hi"
+    assert opt.d == {"a":1, "b": 2}
+    assert from_dict(KDict, a=11, b="hi", c=[1, 2, 3], d={"a":1, "b": 2}).b == "hi"
+
+
+def test_dataclass_generics_work():
+    @dataclass(frozen=True)
+    class KDict:
+        a: int
+        b: Optional[str]
+        c: List[int]
+        d: Dict[str, int]
+
+    opt = from_dict(KDict, a=11, b=None, c=[1, 2, 3], d={"a":1, "b": 2})
+
+    assert opt.a == 11
+    assert opt.b is None
+    assert opt.c == [1, 2, 3]
+    assert opt.d == {"a":1, "b": 2}
+    
+    opt = from_dict(KDict, dict(a=11, b="hi", c=[1, 2, 3], d={"a":1, "b": 2}))
+    
+    assert opt.a == 11
+    assert opt.b == "hi"
+    assert opt.c == [1, 2, 3]
+    assert opt.d == {"a":1, "b": 2}
 
 
 def test_list_of_structures_work(structures: Structures):
@@ -207,7 +251,8 @@ def test_list_of_structures_work(structures: Structures):
     assert [el.bar for el in structs.a] == ["Hi", "Sup", "Ya"]
 
 
-def test_dict_with_substructure(structures: Structures):
+def test_dict_with_substructure(structures: Structures, use_cache: bool):
+    set_caching(use_cache)
     @attr.s(auto_attribs=True)
     class SubDict:
         a: Dict[int, structures.inner_structure]
@@ -221,13 +266,16 @@ def test_dict_with_substructure(structures: Structures):
     }
     structs = from_dict(SubDict, val, fd_check_types=not structures.does_type_validation)
     assert all(k == v.foo for k, v in structs.a.items())
+    cache_disable()
 
 
-def test_union_works():
+def test_union_works(use_cache: bool):
+    set_caching(use_cache)
     @attr.s(auto_attribs=True)
     class UClass:
         a: Union[str, int]
 
     assert from_dict(UClass, {"a": "hello"}, fd_check_types=True).a == "hello"
     assert from_dict(UClass, {"a": 22}, fd_check_types=True).a == 22
+    cache_disable()
 
