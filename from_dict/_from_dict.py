@@ -214,16 +214,19 @@ def handle_dict_argument(
     cls_arg_type_args
 ) -> object:
     cls_argument_origin =  get_origin(cls_argument_type)
-    if ( cls_argument_origin in (dict, typing.Dict)  # in Python36, origin is Dict not dict
-        and _get_constructor_type_hints(cls_arg_type_args[1])):
-        # Dict[a,b]; we only support b being a structure.
-        key_type, value_type = cls_arg_type_args
-        if fd_check_types:  # Perform type check on keys
-            all(type_check(k, key_type) for k in given_argument.keys())
-        argument_value = {
-            k: _from_dict(value_type, v)
-            for k, v in given_argument.items()
-        }
+    if cls_argument_origin in (dict, typing.Dict):  # in Python36, origin is Dict not dict
+        if _get_constructor_type_hints(cls_arg_type_args[1]):
+            # Dict[a,b]; we only support b being a structure.
+            key_type, value_type = cls_arg_type_args
+            if fd_check_types:  # Perform type check on keys
+                all(type_check(k, key_type) for k in given_argument.keys())
+            argument_value = {
+                k: _from_dict(value_type, v)
+                for k, v in given_argument.items()
+            }
+        else:
+            # The dictionary contains values that are primitives (int, str)
+            argument_value = given_argument
     elif cls_argument_origin == Union:
         if (len(cls_arg_type_args) == 2 and cls_arg_type_args[1] == type(None) # Optional
             and _get_constructor_type_hints(cls_arg_type_args[0])):
