@@ -4,7 +4,10 @@ import functools
 from typing import Type, TypeVar, Optional, Mapping, Union, Callable
 
 PYTHON_VERSION = sys.version_info[:2]
-IS_GE_PYTHON38 = PYTHON_VERSION >= (3, 8)  # Support for typing.get_args and typing.get_origin
+IS_GE_PYTHON38 = PYTHON_VERSION >= (
+    3,
+    8,
+)  # Support for typing.get_args and typing.get_origin
 C = TypeVar("C")
 
 
@@ -22,19 +25,20 @@ class FromDictTypeError(TypeError):
 
 
 if IS_GE_PYTHON38:
+
     def get_origin(t):
         return typing.get_origin(t)
 
-
     def get_args(t):
         return typing.get_args(t)
+
 else:
+
     def get_origin(t):
         if hasattr(t, "__origin__"):
             return t.__origin__
         else:
             return None
-
 
     def get_args(t):
         if hasattr(t, "__args__"):
@@ -81,24 +85,26 @@ def type_check(v, t) -> None:
 
 
 def get_constructor_type_hints(
-        cls: Optional[Type], 
-        global_ns: Optional[dict]=None, 
-        local_ns: Optional[dict]=None
+    cls: Optional[Type],
+    global_ns: Optional[dict] = None,
+    local_ns: Optional[dict] = None,
 ) -> Optional[Mapping[str, Type]]:
     if cls is None:
         return None
 
-    return typing.get_type_hints(cls.__init__, global_ns, local_ns) or typing.get_type_hints(cls, global_ns, local_ns)
+    return typing.get_type_hints(
+        cls.__init__, global_ns, local_ns
+    ) or typing.get_type_hints(cls, global_ns, local_ns)
 
 
 def resolve_str_forward_ref(
-    type_or_name: Union[str, Type], 
+    type_or_name: Union[str, Type],
     cls: Type,
-    global_ns: Optional[dict]=None, 
-    local_ns: Optional[dict]=None
+    global_ns: Optional[dict] = None,
+    local_ns: Optional[dict] = None,
 ) -> Type:
     """starting in Python 3.9 types can be list['class-forward-reference'].
-    The inner string is not resolved like when typing.List['class-forward-reference'] is used. 
+    The inner string is not resolved like when typing.List['class-forward-reference'] is used.
     This helper will attempt to resolve these string forward references.
     """
     if isinstance(type_or_name, str):
@@ -112,14 +118,15 @@ def resolve_str_forward_ref(
             raise TypeError(f"Type hint '{type_or_name}' could not be resolved")
     return type_or_name
 
+
 def from_dict(
-        cls: Type[C],
-        fd_from: Optional[dict] = None,
-        fd_check_types: bool = False,
-        fd_copy_unknown: bool = True,
-        fd_global_ns: Optional[dict] = None,
-        fd_local_ns: Optional[dict] = None,
-        **overwrite_kwargs: Optional[dict]
+    cls: Type[C],
+    fd_from: Optional[dict] = None,
+    fd_check_types: bool = False,
+    fd_copy_unknown: bool = True,
+    fd_global_ns: Optional[dict] = None,
+    fd_local_ns: Optional[dict] = None,
+    **overwrite_kwargs: Optional[dict],
 ) -> C:
     """Instantiate a class with parameters given by a dict.
 
@@ -139,9 +146,18 @@ def from_dict(
     :return: Object of cls constructed with keys extracted from fd_from.
     """
 
-    _get_constructor_type_hints = functools.partial(get_constructor_type_hints, global_ns=fd_global_ns, local_ns=fd_local_ns)
-    _resolve_str_forward_ref = functools.partial(resolve_str_forward_ref, cls=cls, global_ns=fd_global_ns, local_ns=fd_local_ns)
-    _from_dict = functools.partial(from_dict, fd_check_types=fd_check_types, fd_global_ns=fd_global_ns, fd_local_ns=fd_local_ns)
+    _get_constructor_type_hints = functools.partial(
+        get_constructor_type_hints, global_ns=fd_global_ns, local_ns=fd_local_ns
+    )
+    _resolve_str_forward_ref = functools.partial(
+        resolve_str_forward_ref, cls=cls, global_ns=fd_global_ns, local_ns=fd_local_ns
+    )
+    _from_dict = functools.partial(
+        from_dict,
+        fd_check_types=fd_check_types,
+        fd_global_ns=fd_global_ns,
+        fd_local_ns=fd_local_ns,
+    )
 
     cls_constructor_argument_types = _get_constructor_type_hints(cls)
     if not cls_constructor_argument_types:
@@ -170,25 +186,40 @@ def from_dict(
         try:
             # Recursively from_dict attributes which are structures, too
             if isinstance(given_argument, dict):
-                argument_value = handle_dict_argument(fd_check_types, _get_constructor_type_hints, _from_dict, 
-                                                      cls_argument_type, given_argument, cls_arg_type_args)
-            elif (isinstance(given_argument, list)
-                and get_origin(cls_argument_type) in (list, typing.List)  # in Python36, origin is List not list
-                and _get_constructor_type_hints(_resolve_str_forward_ref(cls_arg_type_args[0]))):
+                argument_value = handle_dict_argument(
+                    fd_check_types,
+                    _get_constructor_type_hints,
+                    _from_dict,
+                    cls_argument_type,
+                    given_argument,
+                    cls_arg_type_args,
+                )
+            elif (
+                isinstance(given_argument, list)
+                and get_origin(cls_argument_type)
+                in (list, typing.List)  # in Python36, origin is List not list
+                and _get_constructor_type_hints(
+                    _resolve_str_forward_ref(cls_arg_type_args[0])
+                )
+            ):
                 list_var_type = _resolve_str_forward_ref(cls_arg_type_args[0])
                 argument_value = [_from_dict(list_var_type, x) for x in given_argument]
             else:
                 argument_value = given_argument
         except FromDictTypeError as e:
             # Add location for better error message
-            raise FromDictTypeError([cls_argument_name] + e.location, e.expected_type, e.found_type)
+            raise FromDictTypeError(
+                [cls_argument_name] + e.location, e.expected_type, e.found_type
+            )
 
         if fd_check_types:
             try:
                 type_check(argument_value, cls_argument_type)
             except FromDictTypeError as e:
                 # Add location for better error message
-                raise FromDictTypeError([cls_argument_name] + e.location, e.expected_type, e.found_type)
+                raise FromDictTypeError(
+                    [cls_argument_name] + e.location, e.expected_type, e.found_type
+                )
 
         ckwargs[cls_argument_name] = argument_value
         del given_args[cls_argument_name]
@@ -205,31 +236,37 @@ def from_dict(
 
     return created_object
 
+
 def handle_dict_argument(
-    fd_check_types: bool, 
-    _get_constructor_type_hints: Callable[[Type], Optional[Mapping[str, Type]]], 
-    _from_dict: Callable[[Type[C], dict], C], 
-    cls_argument_type: Type, 
-    given_argument: dict, 
-    cls_arg_type_args
+    fd_check_types: bool,
+    _get_constructor_type_hints: Callable[[Type], Optional[Mapping[str, Type]]],
+    _from_dict: Callable[[Type[C], dict], C],
+    cls_argument_type: Type,
+    given_argument: dict,
+    cls_arg_type_args,
 ) -> object:
-    cls_argument_origin =  get_origin(cls_argument_type)
-    if cls_argument_origin in (dict, typing.Dict):  # in Python36, origin is Dict not dict
+    cls_argument_origin = get_origin(cls_argument_type)
+    if cls_argument_origin in (
+        dict,
+        typing.Dict,
+    ):  # in Python36, origin is Dict not dict
         if _get_constructor_type_hints(cls_arg_type_args[1]):
             # Dict[a,b]; we only support b being a structure.
             key_type, value_type = cls_arg_type_args
             if fd_check_types:  # Perform type check on keys
                 all(type_check(k, key_type) for k in given_argument.keys())
             argument_value = {
-                k: _from_dict(value_type, v)
-                for k, v in given_argument.items()
+                k: _from_dict(value_type, v) for k, v in given_argument.items()
             }
         else:
             # The dictionary contains values that are primitives (int, str)
             argument_value = given_argument
     elif cls_argument_origin == Union:
-        if (len(cls_arg_type_args) == 2 and cls_arg_type_args[1] == type(None) # Optional
-            and _get_constructor_type_hints(cls_arg_type_args[0])):
+        if (
+            len(cls_arg_type_args) == 2
+            and cls_arg_type_args[1] == type(None)  # Optional
+            and _get_constructor_type_hints(cls_arg_type_args[0])
+        ):
             argument_value = _from_dict(cls_arg_type_args[0], given_argument)
         else:
             argument_value = given_argument
