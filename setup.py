@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="from-dict",
-    version="0.2.1",
+    version="0.3",
     packages=find_packages(),
     author="Wanja Chresta",
     author_email="wanja.hs@chrummibei.ch",
@@ -18,7 +18,7 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     install_requires=[],
     tests_require=["pytest", "attr"],
 )
