@@ -179,13 +179,38 @@ def test_subscripted_attr_generics_work():
         a: int
         b: Optional[str]
         c: List[int]
+        d: Dict[str, int]
 
-    opt = from_dict(KDict, a=11, b=None, c=[1, 2, 3])
+    opt = from_dict(KDict, a=11, b=None, c=[1, 2, 3], d={"a":1, "b": 2})
 
     assert opt.a == 11
     assert opt.b is None
     assert opt.c == [1, 2, 3]
-    assert from_dict(KDict, a=11, b="hi", c=[1, 2, 3]).b == "hi"
+    assert opt.d == {"a":1, "b": 2}
+    assert from_dict(KDict, a=11, b="hi", c=[1, 2, 3], d={"a":1, "b": 2}).b == "hi"
+
+
+def test_dataclass_generics_work():
+    @dataclass(frozen=True)
+    class KDict:
+        a: int
+        b: Optional[str]
+        c: List[int]
+        d: Dict[str, int]
+
+    opt = from_dict(KDict, a=11, b=None, c=[1, 2, 3], d={"a":1, "b": 2})
+
+    assert opt.a == 11
+    assert opt.b is None
+    assert opt.c == [1, 2, 3]
+    assert opt.d == {"a":1, "b": 2}
+    
+    opt = from_dict(KDict, dict(a=11, b="hi", c=[1, 2, 3], d={"a":1, "b": 2}))
+    
+    assert opt.a == 11
+    assert opt.b == "hi"
+    assert opt.c == [1, 2, 3]
+    assert opt.d == {"a":1, "b": 2}
 
 
 def test_list_of_structures_work(structures: Structures):

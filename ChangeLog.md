@@ -1,5 +1,6 @@
 # Version 0.3 - 2022-08-11
 * Drop support for 3.6
+* Fixing a bug where fields of type Dict[...] were not being parsed properly if the values were primitive types.
 
 # Version 0.2.1 - 2022-06-19
 * Add support for forward-referenced types (thanks to jcal-15)
