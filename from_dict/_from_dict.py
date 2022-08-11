@@ -196,8 +196,7 @@ def from_dict(
                 )
             elif (
                 isinstance(given_argument, list)
-                and get_origin(cls_argument_type)
-                in (list, typing.List)  # in Python36, origin is List not list
+                and get_origin(cls_argument_type) == list
                 and _get_constructor_type_hints(
                     _resolve_str_forward_ref(cls_arg_type_args[0])
                 )
@@ -246,10 +245,7 @@ def handle_dict_argument(
     cls_arg_type_args,
 ) -> object:
     cls_argument_origin = get_origin(cls_argument_type)
-    if cls_argument_origin in (
-        dict,
-        typing.Dict,
-    ):  # in Python36, origin is Dict not dict
+    if cls_argument_origin == dict:
         if _get_constructor_type_hints(cls_arg_type_args[1]):
             # Dict[a,b]; we only support b being a structure.
             key_type, value_type = cls_arg_type_args
