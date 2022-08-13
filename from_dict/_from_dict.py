@@ -130,16 +130,6 @@ def _get_constructor_type_hints(cls: Optional[Type], main_state: MainState):
     # cls = _resolve_str_forward_ref(cls, main_state)
     return get_constructor_type_hints(cls, main_state.global_ns, main_state.local_ns)
 
-    return _get_constructor_type_hints(cls)
-
-
-def _get_constructor_type_hints(cls: Type) -> Mapping[str, Type]:
-    """This is an optimized version of get_constructor_type_hints.
-    Unlike 'get_constructor_type_hints', it can be wrapped by functools.lru_cache
-    because it does not take in dictionary objects.
-    """
-    return typing.get_type_hints(cls.__init__) or typing.get_type_hints(cls)
-
 
 def resolve_str_forward_ref(
     type_or_name: Union[str, Type],
@@ -288,20 +278,19 @@ def from_dict(
 def handle_dict_argument(arg_state: ArgumentState) -> object:
     main_state = arg_state.main_state
 
-    if arg_state.origin in (
-        dict,
-        typing.Dict,
-    ) and _get_constructor_type_hints(  # in Python36, origin is Dict not dict
-        arg_state.args[1], main_state
-    ):
-        # Dict[a,b]; we only support b being a structure.
-        key_type, value_type = arg_state.args
-        if arg_state.main_state.check_types:  # Perform type check on keys
-            all(type_check(k, key_type) for k in arg_state.given_argument.keys())
-        argument_value = {
-            k: _from_dict(value_type, v, main_state)
-            for k, v in arg_state.given_argument.items()
-        }
+    if arg_state.origin == dict:
+        if _get_constructor_type_hints(arg_state.args[1], main_state):
+            # Dict[a,b]; we only support b being a structure.
+            key_type, value_type = arg_state.args
+            if arg_state.main_state.check_types:  # Perform type check on keys
+                all(type_check(k, key_type) for k in arg_state.given_argument.keys())
+            argument_value = {
+                k: _from_dict(value_type, v, main_state)
+                for k, v in arg_state.given_argument.items()
+            }
+        else:
+            # The dictionary contains values that are primitives (int, str)
+            argument_value = arg_state.given_argument
     elif arg_state.origin == Union:
         if (
             len(arg_state.args) == 2
@@ -312,8 +301,8 @@ def handle_dict_argument(arg_state: ArgumentState) -> object:
                 arg_state.args[0], arg_state.given_argument, main_state
             )
         else:
-            argument_value = given_argument
-            for arg_type in cls_arg_type_args:
+            argument_value = arg_state.given_argument
+            for arg_type in arg_state.args:
                 if arg_type == type(None):
                     continue
                 required_keys = {
