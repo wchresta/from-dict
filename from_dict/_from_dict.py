@@ -1,6 +1,7 @@
 import sys
 import typing
 import functools
+from dataclasses import is_dataclass
 from typing import Type, TypeVar, Optional, Mapping, Union, Callable, Any
 
 PYTHON_VERSION = sys.version_info[:2]
@@ -124,6 +125,11 @@ def type_check(check_stack: list, v: Any, t: type) -> None:
             type_check(check_stack + [f"[{k!r}]"], val, type_args[1])
 
 
+def is_attr(cls):
+    # similar to attrs.has()
+    return hasattr(cls, "__attrs_attrs__")
+
+
 @functools.lru_cache(100)
 def get_constructor_type_hints(
     cls: Optional[Type],
@@ -147,16 +153,25 @@ def resolve_str_forward_ref(
     The inner string is not resolved like when typing.List['class-forward-reference'] is used.
     This helper will attempt to resolve these string forward references.
     """
-    if isinstance(type_or_name, str):
-        if ns_types.local_types and type_or_name in ns_types.local_types:
-            return ns_types.local_types[type_or_name]
-        elif ns_types.global_types and type_or_name in ns_types.global_types:
-            return ns_types.global_types[type_or_name]
-        elif hasattr(sys.modules[cls.__module__], type_or_name):
-            return getattr(sys.modules[cls.__module__], type_or_name)
-        else:
-            raise TypeError(f"Type hint '{type_or_name}' could not be resolved")
-    return type_or_name
+    if not isinstance(type_or_name, str):
+        return type_or_name
+    return _resolve_str_forward_ref(type_or_name, cls, ns_types)
+
+
+@functools.lru_cache(100)
+def _resolve_str_forward_ref(
+    type_or_name: str,
+    cls: Type,
+    ns_types: NamespaceTypes,
+) -> Type:
+    if ns_types.local_types and type_or_name in ns_types.local_types:
+        return ns_types.local_types[type_or_name]
+    elif ns_types.global_types and type_or_name in ns_types.global_types:
+        return ns_types.global_types[type_or_name]
+    elif hasattr(sys.modules[cls.__module__], type_or_name):
+        return getattr(sys.modules[cls.__module__], type_or_name)
+    else:
+        raise TypeError(f"Type hint '{type_or_name}' could not be resolved")
 
 
 def from_dict(
@@ -232,29 +247,15 @@ def _from_dict_inner(
         except KeyError:
             continue
 
-        cls_arg_type_args = get_args(cls_argument_type)
         try:
             # Recursively from_dict attributes which are structures, too
-            if isinstance(given_argument, dict):
-                argument_value = handle_dict_argument(
-                    fd_check_types,
-                    _get_constructor_type_hints,
-                    _from_dict,
-                    cls_argument_type,
-                    given_argument,
-                    cls_arg_type_args,
-                )
-            elif (
-                isinstance(given_argument, list)
-                and get_origin(cls_argument_type) == list
-                and _get_constructor_type_hints(
-                    _resolve_str_forward_ref(cls_arg_type_args[0])
-                )
-            ):
-                list_var_type = _resolve_str_forward_ref(cls_arg_type_args[0])
-                argument_value = [_from_dict(list_var_type, x) for x in given_argument]
-            else:
-                argument_value = given_argument
+            argument_value = handle_item(
+                _get_constructor_type_hints,
+                _resolve_str_forward_ref,
+                _from_dict,
+                cls_argument_type,
+                given_argument,
+            )
         except FromDictTypeError as e:
             # Add location for better error message
             raise FromDictTypeError(
@@ -279,46 +280,252 @@ def _from_dict_inner(
     return created_object
 
 
-def handle_dict_argument(
-    fd_check_types: bool,
+def handle_item(
     _get_constructor_type_hints: Callable[[Type], Mapping[str, Type]],
+    _resolve_str_forward_ref,
     _from_dict: Callable[[Type[C], dict], C],
     cls_argument_type: Type,
-    given_argument: dict,
-    cls_arg_type_args,
-) -> object:
-    cls_argument_origin = get_origin(cls_argument_type)
-    if cls_argument_origin == dict:
-        if _get_constructor_type_hints(cls_arg_type_args[1]):
-            # Dict[a,b]; we only support b being a structure.
-            key_type, value_type = cls_arg_type_args
-            argument_value = {
-                k: _from_dict(value_type, v) for k, v in given_argument.items()
-            }
-        else:
-            # The dictionary contains values that are primitives (int, str)
-            argument_value = given_argument
-    elif cls_argument_origin == Union:
-        if (
-            len(cls_arg_type_args) == 2
-            and cls_arg_type_args[1] == type(None)  # Optional
-            and _get_constructor_type_hints(cls_arg_type_args[0])
-        ):
-            argument_value = _from_dict(cls_arg_type_args[0], given_argument)
-        else:
-            argument_value = given_argument
-            for arg_type in cls_arg_type_args:
-                if arg_type == type(None):
-                    continue
-                required_keys = {k for k in _get_constructor_type_hints(arg_type)}
-                if all(k in required_keys for k in given_argument):
-                    try:
-                        argument_value = _from_dict(arg_type, given_argument)
-                        break
-                    except TypeError:
-                        pass
-    elif _get_constructor_type_hints(cls_argument_type):
-        argument_value = _from_dict(cls_argument_type, given_argument)
+    given_argument: Any,
+):
+    """Handles an item who's type has not been determined yet"""
+    if isinstance(given_argument, dict):
+        return handle_dict_argument(
+            _get_constructor_type_hints,
+            _resolve_str_forward_ref,
+            _from_dict,
+            cls_argument_type,
+            get_args(cls_argument_type),
+            given_argument,
+        )
+    elif isinstance(given_argument, list):
+        return handle_list_argument(
+            _get_constructor_type_hints,
+            _resolve_str_forward_ref,
+            _from_dict,
+            cls_argument_type,
+            get_args(cls_argument_type),
+            given_argument,
+        )
+    # TODO: Add support for Tuple?
     else:
-        argument_value = given_argument
-    return argument_value
+        return given_argument
+
+
+def handle_dict_argument(
+    _get_constructor_type_hints: Callable[[Type], Mapping[str, Type]],
+    _resolve_str_forward_ref,
+    _from_dict: Callable[[Type[C], dict], C],
+    cls_argument_type: Type,
+    cls_arg_type_args: tuple,
+    given_argument: dict,
+) -> object:
+    """This is called when the given argument is an instance of 'dict'"""
+
+    # Empty dictionary. Does not matter what the items are.
+    if not given_argument:
+        return given_argument
+
+    # Common case: The expected type is a dataclass or attr
+    if is_dataclass(cls_argument_type) or is_attr(cls_argument_type):
+        return _from_dict(cls_argument_type, given_argument)
+
+    cls_argument_origin = get_origin(cls_argument_type)
+
+    # Expected type is dictionary object with type hints
+    if cls_argument_origin is dict:
+        # Dict[a,b]; we only support b being a structure.
+        value_type = _resolve_str_forward_ref(cls_arg_type_args[1])
+
+        # The dictionary value's type is either a dataclass or attr class
+        # Check this first because it is a common case and a fast check
+        if is_dataclass(value_type) or is_attr(value_type):
+            return {k: _from_dict(value_type, v) for k, v in given_argument.items()}
+
+        # The dictionary value's type can be anything so leave it as it is.
+        if value_type is Any:
+            return given_argument  # TODO: return a copy?
+
+        # A generic type with type-hints
+        value_type_origin = get_origin(value_type)
+        if value_type_origin is not None:
+            if value_type_origin in (dict, list):
+                return {
+                    k: handle_item(
+                        _get_constructor_type_hints,
+                        _resolve_str_forward_ref,
+                        _from_dict,
+                        value_type,
+                        v,
+                    )
+                    for k, v in given_argument.items()
+                }
+
+            if value_type_origin is Union:
+                return {
+                    k: _handle_union(
+                        _get_constructor_type_hints,
+                        _resolve_str_forward_ref,
+                        _from_dict,
+                        value_type,
+                        v,
+                    )
+                    for k, v in given_argument.items()
+                }
+
+        # Any object that has type-hints in the constructor
+        if _get_constructor_type_hints(value_type):
+            return {k: _from_dict(value_type, v) for k, v in given_argument.items()}
+
+        # The dictionary value's type does not need to be converted
+        # Examples: int, str, or dict (with no type-hints)
+        return given_argument  # TODO: return a copy?
+
+    # Expected type is a union of multiple types
+    if cls_argument_origin is Union:
+        return _handle_union(
+            _get_constructor_type_hints,
+            _resolve_str_forward_ref,
+            _from_dict,
+            cls_argument_type,
+            given_argument,
+        )
+
+    # Expected type can be anything so leave it as it is.
+    if cls_argument_type is Any:
+        return given_argument
+
+    # Expected type is any object has type-hints in the constructor
+    if _get_constructor_type_hints(cls_argument_type):
+        return _from_dict(cls_argument_type, given_argument)
+
+    # The argument's type does not need to be converted
+    # Should only be be a dict (with no type-hints)
+    # or the expected type is one that does not have type hints
+    return given_argument  # TODO: return a copy?
+
+
+def handle_list_argument(
+    _get_constructor_type_hints: Callable[[Type], Mapping[str, Type]],
+    _resolve_str_forward_ref,
+    _from_dict: Callable[[Type[C], dict], C],
+    cls_argument_type: Type,
+    cls_arg_type_args: tuple,
+    given_argument: list,
+) -> object:
+    """This is called when the given argument is an instance of 'list'"""
+
+    # Empty list. Does not matter what the elements are.
+    if not given_argument:
+        return given_argument
+
+    cls_argument_origin = get_origin(cls_argument_type)
+
+    # Expected type is list object with type hints
+    if cls_argument_origin is list:
+        element_type = _resolve_str_forward_ref(cls_arg_type_args[0])
+
+        # The list's element's type is either a dataclass or attr class
+        # Check this first because it is a common case and a fast check
+        if is_dataclass(element_type) or is_attr(element_type):
+            return [_from_dict(element_type, x) for x in given_argument]
+
+        # The list element's type can be anything so leave it as it is.
+        if element_type is Any:
+            return given_argument  # TODO: return a copy?
+
+        # A generic type with type-hints
+        element_type_origin = get_origin(element_type)
+        if element_type_origin is not None:
+            if element_type_origin in (dict, list):
+                return [
+                    handle_item(
+                        _get_constructor_type_hints,
+                        _resolve_str_forward_ref,
+                        _from_dict,
+                        element_type,
+                        element,
+                    )
+                    for element in given_argument
+                ]
+
+            if get_origin(element_type) is Union:
+                return [
+                    _handle_union(
+                        _get_constructor_type_hints,
+                        _resolve_str_forward_ref,
+                        _from_dict,
+                        element_type,
+                        v,
+                    )
+                    for v in given_argument
+                ]
+
+        # Any object that has type-hints in the constructor
+        if _get_constructor_type_hints(element_type):
+            return [_from_dict(element_type, x) for x in given_argument]
+
+        # The list value's type does not need to be converted
+        # Examples: int, str, or dict (with no type-hints)
+        return given_argument  # TODO: return a copy?
+
+    # Expected type is a union of multiple types
+    if cls_argument_origin is Union:
+        return _handle_union(
+            _get_constructor_type_hints,
+            _resolve_str_forward_ref,
+            _from_dict,
+            cls_argument_type,
+            given_argument,
+        )
+
+    return given_argument
+
+
+def _handle_union(
+    _get_constructor_type_hints: Callable[[Type], Mapping[str, Type]],
+    _resolve_str_forward_ref,
+    _from_dict: Callable[[Type[C], dict], C],
+    cls_argument_type: Type,
+    given_argument: Any,
+):
+    """This is called when the expected type is a union of multiple types"""
+    if isinstance(given_argument, dict):
+        for arg_type in get_args(cls_argument_type):
+            if arg_type is type(None):
+                continue
+            if get_origin(arg_type) is dict:
+                return handle_dict_argument(
+                    _get_constructor_type_hints,
+                    _resolve_str_forward_ref,
+                    _from_dict,
+                    arg_type,
+                    get_args(arg_type),
+                    given_argument,
+                )
+            required_keys = _get_constructor_type_hints(arg_type)
+            if all(k in required_keys for k in given_argument):
+                try:
+                    return _from_dict(arg_type, given_argument)
+                except TypeError:
+                    pass
+        return given_argument
+
+    if isinstance(given_argument, list):
+        for arg_type in get_args(cls_argument_type):
+            if arg_type is type(None):
+                continue
+            if get_origin(arg_type) is list:
+                try:
+                    return handle_list_argument(
+                        _get_constructor_type_hints,
+                        _resolve_str_forward_ref,
+                        _from_dict,
+                        arg_type,
+                        get_args(arg_type),
+                        given_argument,
+                    )
+                except TypeError:
+                    pass
+        return given_argument
+
+    return given_argument
