@@ -1,17 +1,17 @@
 # from-dict
-Create data structures from dictionaries.
+Create data structures from partially known dictionaries.
 
 ## Features
 * Transform dicts to `attr.s`, `dataclass` and `NamedTuple`
 * Supports nested structures when using `typing.List` and `typing.Dict` type hints.
 * Insert additional fields existing in dict into structure with `fd_copy_unknown=True`
 * Optional run-time type-checking with `fd_check_types=True`
-* Supports forward references since 0.2.1
+* Supports forward references
 
 
 ## Example
 ```python
-from dataclasses import dataclass  # or import attr.dataclass for Python < 3.7
+from dataclasses import dataclass
 from typing import List, Optional
 from from_dict import from_dict
 
@@ -99,4 +99,3 @@ for res in structured_response.results:
         print(f"Component {addr_comp.long_name}")
 
 ```
-
