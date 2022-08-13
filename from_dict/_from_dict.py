@@ -1,5 +1,6 @@
 import sys
 import typing
+import functools
 from dataclasses import dataclass
 from typing import Type, TypeVar, Optional, Mapping, Union, Callable, Any
 
@@ -25,23 +26,27 @@ class FromDictTypeError(TypeError):
 
 
 @dataclass(frozen=True)
-class MainState:
-
-    cls: Type
+class CommonParams:
     check_types: bool
-    copy_unknown: bool
     global_ns: Optional[dict]
     local_ns: Optional[dict]
 
 
-@dataclass
 class ArgumentState:
-    name: str
-    type: Type
-    given_argument: Any
-    main_state: MainState
-    _origin: Optional[Type] = None
-    _args: Optional[tuple] = None
+    def __init__(
+        self, name: str, type: Type, value: Any, cls: Type, common: CommonParams
+    ):
+        self.name = name
+        self.type = type
+        self.value = value
+        self._resolve_str_forward_ref = functools.partial(
+            resolve_str_forward_ref,
+            cls=cls,
+            global_ns=common.global_ns,
+            local_ns=common.local_ns,
+        )
+        self._origin: Optional[Type] = None
+        self._args: Optional[tuple] = None
 
     @property
     def origin(self):
@@ -53,8 +58,7 @@ class ArgumentState:
     def args(self):
         if self._args is None:
             self._args = tuple(
-                _resolve_str_forward_ref(a, self.main_state)
-                for a in get_args(self.type)
+                self._resolve_str_forward_ref(a) for a in get_args(self.type)
             )
         return self._args
 
@@ -124,11 +128,10 @@ def get_constructor_type_hints(
     ) or typing.get_type_hints(cls, global_ns, local_ns)
 
 
-def _get_constructor_type_hints(cls: Optional[Type], main_state: MainState):
+def _get_constructor_type_hints(cls: Optional[Type], common: CommonParams):
     if cls is None:
         return None
-    # cls = _resolve_str_forward_ref(cls, main_state)
-    return get_constructor_type_hints(cls, main_state.global_ns, main_state.local_ns)
+    return get_constructor_type_hints(cls, common.global_ns, common.local_ns)
 
 
 def resolve_str_forward_ref(
@@ -153,20 +156,14 @@ def resolve_str_forward_ref(
     return type_or_name
 
 
-def _resolve_str_forward_ref(type_or_name: Union[str, Type], state: MainState):
-    return resolve_str_forward_ref(
-        type_or_name, state.cls, state.global_ns, state.local_ns
-    )
-
-
-def _from_dict(cls: Type[C], fd_from: dict, state: MainState):
+def _from_dict(cls: Type[C], fd_from: dict, common: CommonParams):
     return from_dict(
         cls,
         fd_from,
-        state.check_types,
-        state.copy_unknown,
-        state.global_ns,
-        state.local_ns,
+        common.check_types,
+        True,
+        common.global_ns,
+        common.local_ns,
     )
 
 
@@ -211,9 +208,7 @@ def from_dict(
     if overwrite_kwargs:
         given_args.update(overwrite_kwargs)
 
-    main_state = MainState(
-        cls, fd_check_types, fd_copy_unknown, fd_global_ns, fd_local_ns
-    )
+    common_params = CommonParams(fd_check_types, fd_global_ns, fd_local_ns)
     ckwargs = {}
     for cls_argument_name, cls_argument_type in cls_constructor_argument_types.items():
         if cls_argument_name == "return" and cls_argument_type is None:
@@ -226,21 +221,21 @@ def from_dict(
             continue
 
         arg_state = ArgumentState(
-            cls_argument_name, cls_argument_type, given_argument, main_state
+            cls_argument_name, cls_argument_type, given_argument, cls, common_params
         )
         try:
             # Recursively from_dict attributes which are structures, too
             if isinstance(given_argument, dict):
-                argument_value = handle_dict_argument(arg_state)
+                argument_value = handle_dict_argument(common_params, arg_state)
             elif (
                 isinstance(given_argument, list)
                 and arg_state.origin
                 in (list, typing.List)  # in Python36, origin is List not list
-                and _get_constructor_type_hints(arg_state.args[0], main_state)
+                and _get_constructor_type_hints(arg_state.args[0], common_params)
             ):
                 list_var_type = arg_state.args[0]
                 argument_value = [
-                    _from_dict(list_var_type, x, main_state) for x in given_argument
+                    _from_dict(list_var_type, x, common_params) for x in given_argument
                 ]
             else:
                 argument_value = given_argument
@@ -275,52 +270,50 @@ def from_dict(
     return created_object
 
 
-def handle_dict_argument(arg_state: ArgumentState) -> object:
-    main_state = arg_state.main_state
-
+def handle_dict_argument(
+    common_params: CommonParams, arg_state: ArgumentState
+) -> object:
     if arg_state.origin == dict:
-        if _get_constructor_type_hints(arg_state.args[1], main_state):
+        if _get_constructor_type_hints(arg_state.args[1], common_params):
             # Dict[a,b]; we only support b being a structure.
             key_type, value_type = arg_state.args
-            if arg_state.main_state.check_types:  # Perform type check on keys
-                all(type_check(k, key_type) for k in arg_state.given_argument.keys())
+            if common_params.check_types:  # Perform type check on keys
+                all(type_check(k, key_type) for k in arg_state.value.keys())
             argument_value = {
-                k: _from_dict(value_type, v, main_state)
-                for k, v in arg_state.given_argument.items()
+                k: _from_dict(value_type, v, common_params)
+                for k, v in arg_state.value.items()
             }
         else:
             # The dictionary contains values that are primitives (int, str)
-            argument_value = arg_state.given_argument
+            argument_value = arg_state.value
     elif arg_state.origin == Union:
         if (
             len(arg_state.args) == 2
             and arg_state.args[1] == type(None)  # Optional
-            and _get_constructor_type_hints(arg_state.args[0], main_state)
+            and _get_constructor_type_hints(arg_state.args[0], common_params)
         ):
             argument_value = _from_dict(
-                arg_state.args[0], arg_state.given_argument, main_state
+                arg_state.args[0], arg_state.value, common_params
             )
         else:
-            argument_value = arg_state.given_argument
+            argument_value = arg_state.value
             for arg_type in arg_state.args:
                 if arg_type == type(None):
                     continue
                 required_keys = {
-                    k for k in _get_constructor_type_hints(arg_type, main_state)
+                    k for k in _get_constructor_type_hints(arg_type, common_params)
                 }
                 required_keys.discard("return")
-                if all(k in required_keys for k in arg_state.given_argument):
+                if all(k in required_keys for k in arg_state.value):
                     try:
                         argument_value = _from_dict(
-                            arg_type, arg_state.given_argument, main_state
+                            arg_type, arg_state.value, common_params
                         )
                         break
                     except TypeError:
                         pass
-    elif _get_constructor_type_hints(arg_state.type, main_state):
-        argument_value = _from_dict(
-            arg_state.type, arg_state.given_argument, main_state
-        )
+    elif _get_constructor_type_hints(arg_state.type, common_params):
+        argument_value = _from_dict(arg_state.type, arg_state.value, common_params)
     else:
-        argument_value = arg_state.given_argument
+        argument_value = arg_state.value
     return argument_value
