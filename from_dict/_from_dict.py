@@ -1,6 +1,7 @@
 import sys
 import typing
 import functools
+from dataclasses import dataclass
 from typing import Type, TypeVar, Optional, Mapping, Union, Callable
 
 PYTHON_VERSION = sys.version_info[:2]
@@ -22,6 +23,44 @@ class FromDictTypeError(TypeError):
 
     def __repr__(self):
         return f"RuntimeTypeError({self.location!r}, {self.expected_type!r}, {self.found_type!r})"
+
+
+class NamespaceTypes:
+    def __init__(self, global_ns: Optional[dict], local_ns: Optional[dict]) -> None:
+        """We only care about the entries with classes in them.
+        For local namespaces if a class is defined inline it will not compare
+        equal to itself.
+        """
+
+        def get_types(ns: dict) -> tuple:
+            items = ((k, v) for k, v in ns.items() if isinstance(v, type))
+            return frozenset(items)
+
+        self._global_types = None if global_ns is None else get_types(global_ns)
+        self._local_types = None if local_ns is None else get_types(local_ns)
+        self._hash = hash((self._global_types, self._local_types))
+
+    @property
+    def global_types(self) -> dict:
+        return None if self._global_types is None else dict(self._global_types)
+
+    @property
+    def local_types(self) -> dict:
+        return None if self._local_types is None else dict(self._local_types)
+
+    def __hash__(self) -> int:
+        return self._hash
+
+    def __eq__(self, o: object) -> bool:
+        if not isinstance(o, NamespaceTypes):
+            return False
+
+        return (
+            self is o
+            or self._hash == o._hash
+            and self._global_types == o._global_types
+            and self._local_types == o._local_types
+        )
 
 
 if IS_GE_PYTHON38:
@@ -84,34 +123,33 @@ def type_check(v, t) -> None:
             type_check(element, targ)
 
 
+@functools.lru_cache(100)
 def get_constructor_type_hints(
     cls: Optional[Type],
-    global_ns: Optional[dict] = None,
-    local_ns: Optional[dict] = None,
+    ns_types: NamespaceTypes,
 ) -> Optional[Mapping[str, Type]]:
     if cls is None:
         return None
 
     return typing.get_type_hints(
-        cls.__init__, global_ns, local_ns
-    ) or typing.get_type_hints(cls, global_ns, local_ns)
+        cls.__init__, ns_types.global_types, ns_types.local_types
+    ) or typing.get_type_hints(cls, ns_types.global_types, ns_types.local_types)
 
 
 def resolve_str_forward_ref(
     type_or_name: Union[str, Type],
     cls: Type,
-    global_ns: Optional[dict] = None,
-    local_ns: Optional[dict] = None,
+    ns_types: NamespaceTypes,
 ) -> Type:
     """starting in Python 3.9 types can be list['class-forward-reference'].
     The inner string is not resolved like when typing.List['class-forward-reference'] is used.
     This helper will attempt to resolve these string forward references.
     """
     if isinstance(type_or_name, str):
-        if local_ns and type_or_name in local_ns:
-            return local_ns[type_or_name]
-        elif global_ns and type_or_name in global_ns:
-            return global_ns[type_or_name]
+        if ns_types.local_types and type_or_name in ns_types.local_types:
+            return ns_types.local_types[type_or_name]
+        elif ns_types.global_types and type_or_name in ns_types.global_types:
+            return ns_types.global_types[type_or_name]
         elif hasattr(sys.modules[cls.__module__], type_or_name):
             return getattr(sys.modules[cls.__module__], type_or_name)
         else:
@@ -145,12 +183,12 @@ def from_dict(
     :param overwrite_kwargs: All additional keys will overwrite whatever is given in the dictionary.
     :return: Object of cls constructed with keys extracted from fd_from.
     """
-
+    ns_types = NamespaceTypes(fd_global_ns, fd_local_ns)
     _get_constructor_type_hints = functools.partial(
-        get_constructor_type_hints, global_ns=fd_global_ns, local_ns=fd_local_ns
+        get_constructor_type_hints, ns_types=ns_types
     )
     _resolve_str_forward_ref = functools.partial(
-        resolve_str_forward_ref, cls=cls, global_ns=fd_global_ns, local_ns=fd_local_ns
+        resolve_str_forward_ref, cls=cls, ns_types=ns_types
     )
     _from_dict = functools.partial(
         from_dict,
