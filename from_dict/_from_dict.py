@@ -1,7 +1,6 @@
 import sys
 import typing
 import functools
-from dataclasses import dataclass
 from typing import Type, TypeVar, Optional, Mapping, Union, Callable
 
 PYTHON_VERSION = sys.version_info[:2]
@@ -32,7 +31,7 @@ class NamespaceTypes:
         equal to itself.
         """
 
-        def get_types(ns: dict) -> tuple:
+        def get_types(ns: dict):
             items = ((k, v) for k, v in ns.items() if isinstance(v, type))
             return frozenset(items)
 
@@ -41,11 +40,11 @@ class NamespaceTypes:
         self._hash = hash((self._global_types, self._local_types))
 
     @property
-    def global_types(self) -> dict:
+    def global_types(self) -> Optional[dict]:
         return None if self._global_types is None else dict(self._global_types)
 
     @property
-    def local_types(self) -> dict:
+    def local_types(self) -> Optional[dict]:
         return None if self._local_types is None else dict(self._local_types)
 
     def __hash__(self) -> int:
