@@ -1,14 +1,8 @@
+from dataclasses import dataclass
 from typing import Optional, Union
 
-import sys
 import pytest
-
-from from_dict import from_dict, FromDictTypeError
-
-if sys.version_info[:2] >= (3, 7):
-    from dataclasses import dataclass
-else:
-    from attr import dataclass
+from from_dict import FromDictTypeError, from_dict
 
 
 @dataclass(frozen=True)
@@ -46,8 +40,10 @@ def test_optional():
     node = from_dict(NodeWithOptional, data, fd_check_types=True)
     assert node.node1.name == "n1"
     assert node.node1.value == "v1"
+    assert isinstance(node.node2, SimpleNode)
     assert node.node2.name == "n2"
     assert node.node2.value == "v2"
+    assert isinstance(node.node3, SimpleNode)
     assert node.node3.name == "n3"
     assert node.node3.value == "v3"
     
@@ -58,6 +54,7 @@ def test_optional():
     node = from_dict(NodeWithOptional, data, fd_check_types=True)
     assert node.node1.name == "n1"
     assert node.node1.value == "v1"
+    assert isinstance(node.node2, SimpleNode)
     assert node.node2.name == "n2"
     assert node.node2.value == "v2"
     assert node.node3 == None
@@ -128,8 +125,8 @@ def test_union_with_builtin_type():
     data = {  "node": {"name": "n1", "no_match": "node-X"} }
     node = from_dict(NodeWithUnionWithBuiltInType, data)
     assert isinstance(node.node, dict)
-    assert node.node["name"] == "n1"
-    assert node.node["no_match"] == "node-X"
+    assert node.node["name"] == "n1"  # type: ignore
+    assert node.node["no_match"] == "node-X"  # type: ignore
     
     data = {  "node": {"name": "n1", "no_match": "node-X"} }
     with pytest.raises(FromDictTypeError) as e:
