@@ -1,7 +1,7 @@
 import sys
 import typing
 import functools
-from typing import Type, TypeVar, Optional, Mapping, Union, Callable
+from typing import Type, TypeVar, Optional, Mapping, Union, Callable, Any
 
 PYTHON_VERSION = sys.version_info[:2]
 IS_GE_PYTHON38 = PYTHON_VERSION >= (
@@ -85,9 +85,11 @@ else:
             return None
 
 
-def type_check(v, t) -> None:
+def type_check(check_stack: list, v: Any, t: type) -> None:
     """Raise RuntimeTypeError if given value does not agree with given type"""
     # This uses typing.get_args and typing.get_origin
+    def location():
+        return ["".join(check_stack)]
 
     try:
         passed_isinstance = isinstance(v, t)
@@ -95,31 +97,39 @@ def type_check(v, t) -> None:
         passed_isinstance = True
 
     if not passed_isinstance:
-        raise FromDictTypeError([], t, type(v))
+        raise FromDictTypeError(location(), t, type(v))
 
     origin = get_origin(t)
     type_args = get_args(t)
     if not origin or not type_args:
         return  # Give up
 
-    if origin == typing.Union:
+    if origin == Union:
         for targ in type_args:
             try:
-                type_check(v, targ)
+                type_check(check_stack, v, targ)
                 return  # Successfully type checked
             except FromDictTypeError:
                 pass
-        raise FromDictTypeError([], t, type(v))
+        raise FromDictTypeError(location(), t, type(v))
 
     if not isinstance(v, origin):  # list ~ List[x], dict ~ Dict[x,y]
-        raise FromDictTypeError([], t, type(v))
+        raise FromDictTypeError(location(), t, type(v))
 
     if origin == list:
         targ = type_args[0]
         if not isinstance(v, list):
-            raise FromDictTypeError([], t, type(v))
-        for element in v:
-            type_check(element, targ)
+            raise FromDictTypeError(location(), t, type(v))
+        for i, element in enumerate(v):
+            type_check(check_stack + [f"[{i}]"], element, targ)
+    elif origin == dict:
+        targ = type_args[0]
+        if not isinstance(v, dict):
+            raise FromDictTypeError(location(), t, type(v))
+        for k, val in v.items():
+            if not isinstance(k, type_args[0]):
+                raise FromDictTypeError(location(), t, type(v))
+            type_check(check_stack + [f"[{k!r}]"], val, type_args[1])
 
 
 @functools.lru_cache(100)
@@ -249,13 +259,7 @@ def from_dict(
             )
 
         if fd_check_types:
-            try:
-                type_check(argument_value, cls_argument_type)
-            except FromDictTypeError as e:
-                # Add location for better error message
-                raise FromDictTypeError(
-                    [cls_argument_name] + e.location, e.expected_type, e.found_type
-                )
+            type_check([cls_argument_name], argument_value, cls_argument_type)
 
         ckwargs[cls_argument_name] = argument_value
         del given_args[cls_argument_name]
@@ -286,8 +290,6 @@ def handle_dict_argument(
         if _get_constructor_type_hints(cls_arg_type_args[1]):
             # Dict[a,b]; we only support b being a structure.
             key_type, value_type = cls_arg_type_args
-            if fd_check_types:  # Perform type check on keys
-                all(type_check(k, key_type) for k in given_argument.keys())
             argument_value = {
                 k: _from_dict(value_type, v) for k, v in given_argument.items()
             }
