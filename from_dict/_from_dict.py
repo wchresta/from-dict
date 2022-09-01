@@ -1,7 +1,7 @@
 import sys
 import typing
 import functools
-from typing import Type, TypeVar, Optional, Mapping, Union, Callable
+from typing import Type, TypeVar, Optional, Mapping, Union, Callable, Any
 
 PYTHON_VERSION = sys.version_info[:2]
 IS_GE_PYTHON38 = PYTHON_VERSION >= (
@@ -163,7 +163,7 @@ def from_dict(
     fd_copy_unknown: bool = True,
     fd_global_ns: Optional[dict] = None,
     fd_local_ns: Optional[dict] = None,
-    **overwrite_kwargs: Optional[dict],
+    **overwrite_kwargs: Any,
 ) -> C:
     """Instantiate a class with parameters given by a dict.
 
@@ -179,27 +179,12 @@ def from_dict(
     :param fd_copy_unknown:
         Should additional keys not used in constructor be inserted into __dict__. This is on by default. This will only
         have an effect if constructed object has a __dict__.
+    :param fd_global_ns: global namespace to help with handling of forward references encoded as string literals
+    :param fd_local_ns: local namespace to help with handling of forward references encoded as string literals
     :param overwrite_kwargs: All additional keys will overwrite whatever is given in the dictionary.
     :return: Object of cls constructed with keys extracted from fd_from.
     """
     ns_types = NamespaceTypes(fd_global_ns, fd_local_ns)
-    _get_constructor_type_hints = functools.partial(
-        get_constructor_type_hints, ns_types=ns_types
-    )
-    _resolve_str_forward_ref = functools.partial(
-        resolve_str_forward_ref, cls=cls, ns_types=ns_types
-    )
-    _from_dict = functools.partial(
-        from_dict,
-        fd_check_types=fd_check_types,
-        fd_global_ns=fd_global_ns,
-        fd_local_ns=fd_local_ns,
-    )
-
-    cls_constructor_argument_types = _get_constructor_type_hints(cls)
-    if not cls_constructor_argument_types:
-        raise TypeError(f"Given class {cls} is not supported by from_dict")
-
     given_args = {}
     if fd_from:
         if not isinstance(fd_from, dict):
@@ -207,6 +192,35 @@ def from_dict(
         given_args.update(fd_from)
     if overwrite_kwargs:
         given_args.update(overwrite_kwargs)
+    return _from_dict_inner(cls, given_args, fd_check_types, fd_copy_unknown, ns_types)
+
+
+def _from_dict_inner(
+    cls: Type[C],
+    given_args: Union[dict, Any],
+    fd_check_types: bool,
+    fd_copy_unknown: bool,
+    ns_types: NamespaceTypes,
+) -> C:
+    if not isinstance(given_args, dict):
+        return given_args
+
+    _get_constructor_type_hints = functools.partial(
+        get_constructor_type_hints, ns_types=ns_types
+    )
+    _resolve_str_forward_ref = functools.partial(
+        resolve_str_forward_ref, cls=cls, ns_types=ns_types
+    )
+    _from_dict = functools.partial(
+        _from_dict_inner,
+        fd_check_types=fd_check_types,
+        fd_copy_unknown=fd_copy_unknown,
+        ns_types=ns_types,
+    )
+
+    cls_constructor_argument_types = _get_constructor_type_hints(cls)
+    if not cls_constructor_argument_types:
+        raise TypeError(f"Given class {cls} is not supported by from_dict")
 
     ckwargs = {}
     for cls_argument_name, cls_argument_type in cls_constructor_argument_types.items():
@@ -258,7 +272,6 @@ def from_dict(
                 )
 
         ckwargs[cls_argument_name] = argument_value
-        del given_args[cls_argument_name]
 
     created_object = cls(**ckwargs)
 
@@ -267,7 +280,7 @@ def from_dict(
         # Add the rest of the arguments to the dict, if possible.
         # Do not overwrite existing keys
         for arg, val in given_args.items():
-            if arg not in created_object.__dict__:
+            if arg not in ckwargs and arg not in created_object.__dict__:
                 created_object.__dict__[arg] = val
 
     return created_object
