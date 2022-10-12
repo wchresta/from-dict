@@ -1,14 +1,9 @@
 
-from typing import Optional, List, Dict
-
 import sys
+from dataclasses import dataclass
+from typing import Dict, List, Optional
 
 from from_dict import from_dict
-
-if sys.version_info[:2] >= (3, 7):
-    from dataclasses import dataclass
-else:
-    from attr import dataclass
 
 if sys.version_info[:2] >= (3, 9):
     LIST = list
@@ -48,6 +43,7 @@ def test_local_self_ref_in_optional():
     data = {"name": "n1", "next": {"name": "n2", "next": None}}
     node = from_dict(Node, data, fd_check_types=True, fd_local_ns=locals())
     assert node.name == "n1"
+    assert isinstance(node.next, Node)
     assert node.next.name == "n2"
 
     

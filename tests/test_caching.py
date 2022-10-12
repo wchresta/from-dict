@@ -47,9 +47,6 @@ class InnerData:
     tags: List[str]
 
 def test_cache_speed_improvement():
-    if sys.version_info[:2] == (3, 6):
-        pytest.skip("Python 3.6 requires the use of globals(). This disabled caching.")
-    
     test_data =  {
         'name': 'root', 
         'id': 12324, 
@@ -84,7 +81,7 @@ def test_cache_speed_improvement():
     cache_enable()
     assert disabled_time > (enabled_time * 2)
 
-def _get_time_for_x_calls(test_data: str):
+def _get_time_for_x_calls(test_data: dict):
     start_time = time.time()
     LOOPS = 1_000
     for _ in range(LOOPS):

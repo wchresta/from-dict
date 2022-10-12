@@ -1,10 +1,6 @@
-import sys
-
-if sys.version_info[:2] >= (3, 7):
-    from dataclasses import dataclass
-else:
-    from attr import dataclass
+from dataclasses import dataclass
 from typing import List, Optional
+
 from from_dict import from_dict
 
 
