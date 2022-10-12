@@ -4,10 +4,8 @@ import functools
 from typing import Type, TypeVar, Optional, Mapping, Union, Callable
 
 PYTHON_VERSION = sys.version_info[:2]
-IS_GE_PYTHON38 = PYTHON_VERSION >= (
-    3,
-    8,
-)  # Support for typing.get_args and typing.get_origin
+# Support for typing.get_args and typing.get_origin
+IS_GE_PYTHON38 = PYTHON_VERSION >= (3, 8)
 C = TypeVar("C")
 
 
@@ -63,26 +61,20 @@ class NamespaceTypes:
 
 
 if IS_GE_PYTHON38:
-
-    def get_origin(t):
-        return typing.get_origin(t)
-
-    def get_args(t):
-        return typing.get_args(t)
-
+    from typing import get_origin, get_args
 else:
 
-    def get_origin(t):
-        if hasattr(t, "__origin__"):
-            return t.__origin__
+    def get_origin(tp) -> Optional[type]:
+        if hasattr(tp, "__origin__"):
+            return tp.__origin__
         else:
             return None
 
-    def get_args(t):
-        if hasattr(t, "__args__"):
-            return t.__args__
+    def get_args(tp) -> tuple:
+        if hasattr(tp, "__args__"):
+            return tp.__args__
         else:
-            return None
+            return ()
 
 
 def type_check(v, t) -> None:
@@ -126,13 +118,14 @@ def type_check(v, t) -> None:
 def get_constructor_type_hints(
     cls: Optional[Type],
     ns_types: NamespaceTypes,
-) -> Optional[Mapping[str, Type]]:
+) -> Mapping[str, Type]:
     if cls is None:
-        return None
+        return {}
 
-    return typing.get_type_hints(
+    hints = typing.get_type_hints(
         cls.__init__, ns_types.global_types, ns_types.local_types
     ) or typing.get_type_hints(cls, ns_types.global_types, ns_types.local_types)
+    return {k: v for k, v in hints.items() if (k != "return" and v is not type(None))}
 
 
 def resolve_str_forward_ref(
@@ -210,10 +203,6 @@ def from_dict(
 
     ckwargs = {}
     for cls_argument_name, cls_argument_type in cls_constructor_argument_types.items():
-        if cls_argument_name == "return" and cls_argument_type is None:
-            # Ignore return argument
-            continue
-
         try:
             given_argument = given_args[cls_argument_name]
         except KeyError:
@@ -275,7 +264,7 @@ def from_dict(
 
 def handle_dict_argument(
     fd_check_types: bool,
-    _get_constructor_type_hints: Callable[[Type], Optional[Mapping[str, Type]]],
+    _get_constructor_type_hints: Callable[[Type], Mapping[str, Type]],
     _from_dict: Callable[[Type[C], dict], C],
     cls_argument_type: Type,
     given_argument: dict,
@@ -307,7 +296,6 @@ def handle_dict_argument(
                 if arg_type == type(None):
                     continue
                 required_keys = {k for k in _get_constructor_type_hints(arg_type)}
-                required_keys.discard("return")
                 if all(k in required_keys for k in given_argument):
                     try:
                         argument_value = _from_dict(arg_type, given_argument)
