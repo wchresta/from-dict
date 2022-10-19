@@ -166,6 +166,70 @@ def test_invalid_type_discovered_in_subdict(structures: Structures):
     assert str(e.value) == "For \"baz.bar\", expected <class 'str'> but found <class 'list'>"
 
 
+def test_invalid_list_element_type():
+    @dataclass(frozen=True)
+    class TstClass:
+        a: int
+        b: Optional[str]
+        c: List[int]
+        d: Dict[str, int]
+
+    with pytest.raises(FromDictTypeError) as e:
+        opt = from_dict(TstClass, a=11, b=None, c=[1, 2, 3, "bad"], d={"a":1, "b": 2}, fd_check_types=True)
+        
+    assert str(e.value) == "For \"c[3]\", expected <class 'int'> but found <class 'str'>"
+
+
+def test_invalid_dict_element_type():
+    @dataclass(frozen=True)
+    class TstClass:
+        a: int
+        b: Optional[str]
+        c: List[int]
+        d: Dict[str, int]
+
+    with pytest.raises(FromDictTypeError) as e:
+        opt = from_dict(TstClass, a=11, b=None, c=[1, 2, 3, 4], d={"a":1, "b": 2, "C": "bad"}, fd_check_types=True)
+        
+    assert str(e.value) == "For \"d['C']\", expected <class 'int'> but found <class 'str'>"
+
+
+def test_invalid_list_element_type_in_subclass():
+    @dataclass(frozen=True)
+    class TstClass:
+        a: int
+        b: Optional[str]
+        c: List[int]
+        d: Dict[str, int]
+        
+    @dataclass(frozen=True)
+    class TstClassMain:
+        foo: TstClass
+
+    with pytest.raises(FromDictTypeError) as e:
+        opt = from_dict(TstClassMain, foo=dict(a=11, b=None, c=[1, 2, 3, "bad"], d={"a":1, "b": 2}), fd_check_types=True)
+        
+    assert str(e.value) == "For \"foo.c[3]\", expected <class 'int'> but found <class 'str'>"
+
+
+def test_invalid_dict_element_type_in_subclass():
+    @dataclass(frozen=True)
+    class TstClass:
+        a: int
+        b: Optional[str]
+        c: List[int]
+        d: Dict[str, int]
+        
+    @dataclass(frozen=True)
+    class TstClassMain:
+        foo: TstClass
+
+    with pytest.raises(FromDictTypeError) as e:
+        opt = from_dict(TstClassMain, foo=dict(a=11, b=None, c=[1, 2, 3, 4], d={"a":1, "b": 2, "C": "bad"}), fd_check_types=True)
+        
+    assert str(e.value) == "For \"foo.d['C']\", expected <class 'int'> but found <class 'str'>"
+
+
 def test_subscripted_attr_generics_work():
     @attr.s(auto_attribs=True)
     class KDict:
