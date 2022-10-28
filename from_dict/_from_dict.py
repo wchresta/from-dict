@@ -19,7 +19,7 @@ class FromDictTypeError(TypeError):
         return f"For \"{'.'.join(self.location)}\", expected {self.expected_type} but found {self.found_type}"
 
     def __repr__(self):
-        return f"RuntimeTypeError({self.location!r}, {self.expected_type!r}, {self.found_type!r})"
+        return f"FromDictTypeError({self.location!r}, {self.expected_type!r}, {self.found_type!r})"
 
 
 class NamespaceTypes:
@@ -78,7 +78,7 @@ else:
 
 
 def type_check(check_stack: list, v: Any, t: type) -> None:
-    """Raise RuntimeTypeError if given value does not agree with given type"""
+    """Raise FromDictTypeError if given value does not agree with given type"""
     # This uses typing.get_args and typing.get_origin
     def location():
         return ["".join(check_stack)]
@@ -257,9 +257,10 @@ def _from_dict_inner(
                 argument_value = given_argument
         except FromDictTypeError as e:
             # Add location for better error message
-            raise FromDictTypeError(
+            e = FromDictTypeError(
                 [cls_argument_name] + e.location, e.expected_type, e.found_type
-            )
+            ).with_traceback(sys.exc_info()[2])
+            raise e from None
 
         if fd_check_types:
             type_check([cls_argument_name], argument_value, cls_argument_type)

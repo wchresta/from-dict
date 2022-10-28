@@ -178,6 +178,7 @@ def test_invalid_list_element_type():
         opt = from_dict(TstClass, a=11, b=None, c=[1, 2, 3, "bad"], d={"a":1, "b": 2}, fd_check_types=True)
         
     assert str(e.value) == "For \"c[3]\", expected <class 'int'> but found <class 'str'>"
+    assert not e.value.__suppress_context__
 
 
 def test_invalid_dict_element_type():
@@ -192,6 +193,7 @@ def test_invalid_dict_element_type():
         opt = from_dict(TstClass, a=11, b=None, c=[1, 2, 3, 4], d={"a":1, "b": 2, "C": "bad"}, fd_check_types=True)
         
     assert str(e.value) == "For \"d['C']\", expected <class 'int'> but found <class 'str'>"
+    assert not e.value.__suppress_context__
 
 
 def test_invalid_list_element_type_in_subclass():
@@ -210,6 +212,7 @@ def test_invalid_list_element_type_in_subclass():
         opt = from_dict(TstClassMain, foo=dict(a=11, b=None, c=[1, 2, 3, "bad"], d={"a":1, "b": 2}), fd_check_types=True)
         
     assert str(e.value) == "For \"foo.c[3]\", expected <class 'int'> but found <class 'str'>"
+    assert e.value.__suppress_context__
 
 
 def test_invalid_dict_element_type_in_subclass():
@@ -228,6 +231,7 @@ def test_invalid_dict_element_type_in_subclass():
         opt = from_dict(TstClassMain, foo=dict(a=11, b=None, c=[1, 2, 3, 4], d={"a":1, "b": 2, "C": "bad"}), fd_check_types=True)
         
     assert str(e.value) == "For \"foo.d['C']\", expected <class 'int'> but found <class 'str'>"
+    assert e.value.__suppress_context__
 
 
 def test_subscripted_attr_generics_work():
