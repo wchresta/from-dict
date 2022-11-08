@@ -12,22 +12,28 @@ from from_dict import from_dict
 # performance gains.
 
 import from_dict._from_dict as _fd
-cached  = _fd.get_constructor_type_hints
-wrapped  = _fd.get_constructor_type_hints.__wrapped__
+hints_cached_func  = _fd.get_constructor_type_hints
+hints_wrapped_func  = _fd.get_constructor_type_hints.__wrapped__
+
+fwd_ref_cached_func  = _fd._resolve_str_forward_ref
+fwd_ref_wrapped_func = _fd._resolve_str_forward_ref.__wrapped__
 
 def cache_disable():
-    global wrapped
-    global cached
-    _fd.get_constructor_type_hints = wrapped
+    global hints_wrapped_func
+    global fwd_ref_wrapped_func
+    _fd.get_constructor_type_hints = hints_wrapped_func
+    _fd._resolve_str_forward_ref = fwd_ref_wrapped_func
 
 def cache_is_enabled():
-    return _fd.get_constructor_type_hints == cached
+    return _fd.get_constructor_type_hints == hints_cached_func
 
 def cache_enable():
-    global wrapped
-    global cached
-    _fd.get_constructor_type_hints = cached
-    cached.cache_clear()
+    global hints_cached_func
+    global fwd_ref_cached_func
+    _fd.get_constructor_type_hints = hints_cached_func
+    _fd._resolve_str_forward_ref = fwd_ref_cached_func
+    hints_cached_func.cache_clear()
+    fwd_ref_cached_func.cache_clear()
 
 # ...................................................................
 

@@ -2,7 +2,7 @@
 Create data structures from partially known dictionaries.
 
 ## Features
-* Transform dicts to `attr.s`, `dataclass` and `NamedTuple`
+* Transform dicts to `attr.s`, `dataclass`, `NamedTuple`, and normal classes that have type-hints for all their __init__ parameters.
 * Supports nested structures when using `typing.List` and `typing.Dict` type hints.
 * Insert additional fields existing in dict into structure with `fd_copy_unknown=True`
 * Optional run-time type-checking with `fd_check_types=True`
