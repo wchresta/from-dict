@@ -1,12 +1,14 @@
+import functools
 import sys
 import typing
-import functools
 from dataclasses import is_dataclass
-from typing import Type, TypeVar, Optional, Mapping, Union, Callable, Any
+from typing import Any, Callable, Dict, ForwardRef, Mapping, Optional, Type
+from typing import TypeVar, Union
 
 PYTHON_VERSION = sys.version_info[:2]
 # Support for typing.get_args and typing.get_origin
 IS_GE_PYTHON38 = PYTHON_VERSION >= (3, 8)
+IS_GE_PYTHON39 = PYTHON_VERSION >= (3, 9)
 C = TypeVar("C")
 
 
@@ -62,7 +64,7 @@ class NamespaceTypes:
 
 
 if IS_GE_PYTHON38:
-    from typing import get_origin, get_args
+    from typing import get_args, get_origin
 else:
 
     def get_origin(tp) -> Optional[type]:
@@ -138,10 +140,52 @@ def get_constructor_type_hints(
     if cls is None:
         return {}
 
-    hints = typing.get_type_hints(
-        cls.__init__, ns_types.global_types, ns_types.local_types
-    ) or typing.get_type_hints(cls, ns_types.global_types, ns_types.local_types)
+    if hasattr(cls, "__parameters__"):
+        hints = _resolve_generic_class(cls, ns_types)
+    else:
+        hints = typing.get_type_hints(
+            cls.__init__, ns_types.global_types, ns_types.local_types
+        ) or typing.get_type_hints(cls, ns_types.global_types, ns_types.local_types)
     return {k: v for k, v in hints.items() if (k != "return" and v is not type(None))}
+
+
+def _resolve_generic_class(
+    cls: Type,
+    ns_types: NamespaceTypes,
+) -> Mapping[str, Type]:
+    """This is for classes that inherit from Generic.
+    Swap out the generic parameters with the type args.
+    """
+
+    def resolve_generic_arg(arg_cls: Type, swaps: Dict[str, str]):
+        # A generic type definition inside the generic class
+        arg_args = list(get_args(arg_cls))
+        for i, arg in enumerate(arg_args):
+            if arg in swaps:
+                arg_args[i] = swaps[arg]
+            elif get_args(arg):
+                arg_args[i] = resolve_generic_arg(arg, swaps)
+
+        arg_origin = get_origin(arg_cls)
+        if not IS_GE_PYTHON39:
+            if arg_origin is list:
+                arg_origin = typing.List
+            elif arg_origin is dict:
+                arg_origin = typing.Dict
+        return arg_origin[tuple(arg_args)]  # type: ignore
+
+    origin = get_origin(cls)
+    args = [resolve_str_forward_ref(a, cls, ns_types) for a in get_args(cls)]
+    swaps = dict(zip(getattr(origin, "__parameters__"), args))
+    hints = typing.get_type_hints(
+        origin.__init__, ns_types.global_types, ns_types.local_types
+    ) or typing.get_type_hints(origin, ns_types.global_types, ns_types.local_types)
+    for k, v in hints.items():
+        if v in swaps:
+            hints[k] = swaps[v]
+        elif get_args(v):
+            hints[k] = resolve_generic_arg(v, swaps)
+    return hints
 
 
 def resolve_str_forward_ref(
@@ -153,6 +197,8 @@ def resolve_str_forward_ref(
     The inner string is not resolved like when typing.List['class-forward-reference'] is used.
     This helper will attempt to resolve these string forward references.
     """
+    if isinstance(type_or_name, ForwardRef):
+        type_or_name = type_or_name.__forward_arg__
     if not isinstance(type_or_name, str):
         return type_or_name
     return _resolve_str_forward_ref(type_or_name, cls, ns_types)

@@ -2,7 +2,7 @@ import copy
 import datetime
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union, Type, Callable
+from typing import Any, Dict, List, Optional, Union, Type, Callable, TypeVar, Generic
 
 from from_dict import FromDictTypeError, from_dict
 
@@ -29,194 +29,39 @@ class DataClass:
 class AttrClass:
     attrib: str
 
+TTestType = TypeVar("TTestType")
+TSelfRef = TypeVar("TSelfRef")
 
 @dataclass
-class ClassPrimitives:
-    normal: int
-    optional: Optional[int]
-    union: Union[int, str, NormalClass, DataClass]
+class ClassBase(Generic[TTestType, TSelfRef]):
+    normal: TTestType
+    optional: Optional[TTestType]
+    union: Union[str, NormalClass, DataClass, TTestType]
     any: Any
-    self_ref: Optional['ClassPrimitives']
+    self_ref: Optional[TSelfRef]
 
-    list_normal: List[int]
-    list_optional: List[Optional[int]]
-    list_union: List[Union[int, str, NormalClass, DataClass]]
+    list_normal: List[TTestType]
+    list_optional: List[Optional[TTestType]]
+    list_union: List[Union[str, NormalClass, DataClass, TTestType]]
     list_any: List[Any]
-    list_self_ref: List['ClassPrimitives']
+    list_self_ref: List[TSelfRef]
     
-    dict_normal: Dict[str, int]
-    dict_optional: Dict[str, Optional[int]]
-    dict_union: Dict[str, Union[int, str, NormalClass, DataClass]]
+    dict_normal: Dict[str, TTestType]
+    dict_optional: Dict[str, Optional[TTestType]]
+    dict_union: Dict[str, Union[str, NormalClass, DataClass, TTestType]]
     dict_any: Dict[str, Any]
-    dict_self_ref: Dict[str, 'ClassPrimitives']
+    dict_self_ref: Dict[str, TSelfRef]
 
 
-@dataclass
-class ClassDict:
-    normal: Dict[str,str]
-    optional: Optional[Dict[str,str]]
-    union: Union[str, NormalClass, DataClass, Dict[str,str]]
-    any: Any
-    self_ref: Optional['ClassDict']
-
-    list_normal: List[Dict[str,str]]
-    list_optional: List[Optional[Dict[str,str]]]
-    list_union: List[Union[str, NormalClass, DataClass, Dict[str,str]]]
-    list_any: List[Any]
-    list_self_ref: List['ClassDict']
-    
-    dict_normal: Dict[str, Dict[str,str]]
-    dict_optional: Dict[str, Optional[Dict[str,str]]]
-    dict_union: Dict[str, Union[str, NormalClass, DataClass, Dict[str,str]]]
-    dict_any: Dict[str, Any]
-    dict_self_ref: Dict[str, 'ClassDict']
-
-
-@dataclass
-class ClassDictSimple:
-    normal: Dict[str,str]
-    optional: Optional[dict]
-    union: Union[str, NormalClass, DataClass, dict]
-    any: Any
-    self_ref: Optional['ClassDictSimple']
-
-    list_normal: List[dict]
-    list_optional: List[Optional[dict]]
-    list_union: List[Union[str, NormalClass, DataClass, dict]]
-    list_any: List[Any]
-    list_self_ref: List['ClassDictSimple']
-    
-    dict_normal: Dict[str, dict]
-    dict_optional: Dict[str, Optional[dict]]
-    dict_union: Dict[str, Union[str, NormalClass, DataClass, dict]]
-    dict_any: Dict[str, Any]
-    dict_self_ref: Dict[str, 'ClassDictSimple']
-
-
-@dataclass
-class ClassList:
-    normal: List[str]
-    optional: Optional[List[str]]
-    union: Union[str, NormalClass, DataClass, List[str]]
-    any: Any
-    self_ref: Optional['ClassList']
-
-    list_normal: List[List[str]]
-    list_optional: List[Optional[List[str]]]
-    list_union: List[Union[str, NormalClass, DataClass, List[str]]]
-    list_any: List[Any]
-    list_self_ref: List['ClassList']
-    
-    dict_normal: Dict[str, List[str]]
-    dict_optional: Dict[str, Optional[List[str]]]
-    dict_union: Dict[str, Union[str, NormalClass, DataClass, List[str]]]
-    dict_any: Dict[str, Any]
-    dict_self_ref: Dict[str, 'ClassList']
-
-
-@dataclass
-class ClassDataClass:
-    normal: DataClass
-    optional: Optional[DataClass]
-    union: Union[DataClass, str, NormalClass, DataClass]
-    any: Any
-    self_ref: Optional['ClassDataClass']
-
-    list_normal: List[DataClass]
-    list_optional: List[Optional[DataClass]]
-    list_union: List[Union[DataClass, str, NormalClass, DataClass]]
-    list_any: List[Any]
-    list_self_ref: List['ClassDataClass']
-    
-    dict_normal: Dict[str, DataClass]
-    dict_optional: Dict[str, Optional[DataClass]]
-    dict_union: Dict[str, Union[DataClass, str, NormalClass, DataClass]]
-    dict_any: Dict[str, Any]
-    dict_self_ref: Dict[str, 'ClassDataClass']
-
-
-@dataclass
-class ClassNormalClass:
-    normal: NormalClass
-    optional: Optional[NormalClass]
-    union: Union[NormalClass, str, NormalClass, DataClass]
-    any: Any
-    self_ref: Optional['ClassNormalClass']
-
-    list_normal: List[NormalClass]
-    list_optional: List[Optional[NormalClass]]
-    list_union: List[Union[NormalClass, str, NormalClass, DataClass]]
-    list_any: List[Any]
-    list_self_ref: List['ClassNormalClass']
-    
-    dict_normal: Dict[str, NormalClass]
-    dict_optional: Dict[str, Optional[NormalClass]]
-    dict_union: Dict[str, Union[NormalClass, str, NormalClass, DataClass]]
-    dict_any: Dict[str, Any]
-    dict_self_ref: Dict[str, 'ClassNormalClass']
-
-
-@dataclass
-class ClassAttrClass:
-    normal: AttrClass
-    optional: Optional[AttrClass]
-    union: Union[AttrClass, str, NormalClass, DataClass]
-    any: Any
-    self_ref: Optional['ClassAttrClass']
-
-    list_normal: List[AttrClass]
-    list_optional: List[Optional[AttrClass]]
-    list_union: List[Union[AttrClass, str, NormalClass, DataClass]]
-    list_any: List[Any]
-    list_self_ref: List['ClassAttrClass']
-    
-    dict_normal: Dict[str, AttrClass]
-    dict_optional: Dict[str, Optional[AttrClass]]
-    dict_union: Dict[str, Union[AttrClass, str, NormalClass, DataClass]]
-    dict_any: Dict[str, Any]
-    dict_self_ref: Dict[str, 'ClassAttrClass']
-
-
-@dataclass
-class ClassListDataClass:
-    normal: List[DataClass]
-    optional: Optional[List[DataClass]]
-    union: Union[str, NormalClass, DataClass, List[DataClass]]
-    any: Any
-    self_ref: Optional['ClassListDataClass']
-
-    list_normal: List[List[DataClass]]
-    list_optional: List[Optional[List[DataClass]]]
-    list_union: List[Union[str, NormalClass, DataClass, List[DataClass]]]
-    list_any: List[Any]
-    list_self_ref: List['ClassListDataClass']
-    
-    dict_normal: Dict[str, List[DataClass]]
-    dict_optional: Dict[str, Optional[List[DataClass]]]
-    dict_union: Dict[str, Union[str, NormalClass, DataClass, List[DataClass]]]
-    dict_any: Dict[str, Any]
-    dict_self_ref: Dict[str, 'ClassListDataClass']
-
-
-@dataclass
-class ClassDictDataClass:
-    normal: Dict[str, DataClass]
-    optional: Optional[Dict[str, DataClass]]
-    union: Union[str, NormalClass, DataClass, Dict[str, DataClass]]
-    any: Any
-    self_ref: Optional['ClassDictDataClass']
-
-    list_normal: List[Dict[str, DataClass]]
-    list_optional: List[Optional[Dict[str, DataClass]]]
-    list_union: List[Union[str, NormalClass, DataClass, Dict[str, DataClass]]]
-    list_any: List[Any]
-    list_self_ref: List['ClassDictDataClass']
-    
-    dict_normal: Dict[str, Dict[str, DataClass]]
-    dict_optional: Dict[str, Optional[Dict[str, DataClass]]]
-    dict_union: Dict[str, Union[str, NormalClass, DataClass, Dict[str, DataClass]]]
-    dict_any: Dict[str, Any]
-    dict_self_ref: Dict[str, 'ClassDictDataClass']
+ClassPrimitives = ClassBase[int, "ClassPrimitives"]
+ClassDict = ClassBase[Dict[str,str], "ClassDict"]
+ClassDictSimple = ClassBase[dict, "ClassDictSimple"]
+ClassList = ClassBase[List[str], "ClassList"]
+ClassDataClass = ClassBase[DataClass, "ClassDataClass"]
+ClassNormalClass = ClassBase[NormalClass, "ClassNormalClass"]
+ClassAttrClass = ClassBase[AttrClass, "ClassAttrClass"]
+ClassListDataClass = ClassBase[List[DataClass], "ClassListDataClass"]
+ClassDictDataClass = ClassBase[Dict[str, DataClass], "ClassDictDataClass"]
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # helper functions
