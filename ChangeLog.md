@@ -1,6 +1,10 @@
+# Version 0.3.3 - 2022-11-27
+* Adding basic support for classes that inherit from 
+  classes that inherit from `Generic[...]`
+
 # Version 0.3.2 - 2022-11-13
 * Adding support for classes that inherit from `Generic[...]`
-* 
+
 # Version 0.3.1 - 2022-11-08
 * Improvements to type error messages.
 * Expand support of complex types.
