@@ -175,6 +175,11 @@ def _resolve_generic_class(
         return arg_origin[tuple(arg_args)]  # type: ignore
 
     origin = get_origin(cls)
+    if origin is None and hasattr(cls, "__orig_bases__"):
+        # Only support the inherit from a generic class if it is
+        # the first class in the mro.
+        cls = cls.__orig_bases__[0]
+        origin = get_origin(cls)
     args = [resolve_str_forward_ref(a, cls, ns_types) for a in get_args(cls)]
     swaps = dict(zip(getattr(origin, "__parameters__"), args))
     hints = typing.get_type_hints(
