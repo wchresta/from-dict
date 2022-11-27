@@ -349,6 +349,35 @@ def test_generic_dataclass():
     assert isinstance(v.field_4, int)
 
 
+def test_parent_generic_dataclass():
+    TField1 = TypeVar('TField1')
+    TField2 = TypeVar('TField2')
+    @dataclass(frozen=True)
+    class Data1:
+        value: int
+
+    @dataclass(frozen=True)
+    class Data2:
+        value: str
+
+    @dataclass(frozen=True)
+    class TstClassMainParent(Generic[TField1, TField2]):
+        field_1: TField1
+        field_2: TField2
+        field_3: str
+        field_4: int
+
+    @dataclass(frozen=True)
+    class TstClassMain(TstClassMainParent[Data1, Data2]):
+        pass
+        
+    v = from_dict(TstClassMain, field_1=dict(value=1), field_2={"value":"1"}, field_3="s", field_4=1, fd_check_types=True)
+    assert isinstance(v.field_1, Data1)
+    assert isinstance(v.field_2, Data2)
+    assert isinstance(v.field_3, str)
+    assert isinstance(v.field_4, int)
+
+
 def test_generic_norm_class():
     TParam1 = TypeVar('TParam1')
     TParam2 = TypeVar('TParam2')
@@ -378,6 +407,35 @@ def test_generic_norm_class():
     assert isinstance(v.field_2, Data1)
     assert isinstance(v.field_3, str)
     assert isinstance(v.field_4, int)
+
+
+def test_parent_generic_norm_class():
+    TParam1 = TypeVar('TParam1')
+    TParam2 = TypeVar('TParam2')
+    @dataclass(frozen=True)
+    class Data1:
+        value: int
+
+    @dataclass(frozen=True)
+    class Data2:
+        value: str
+
+    class TstClassMainParent(Generic[TParam1, TParam2]):
+        def __init__(self, param_1: TParam1, param_2: TParam2, param_3: str, param_4: int) -> None:
+            self.field_1 = param_1
+            self.field_2 = param_2
+            self.field_3 = param_3
+            self.field_4 = param_4
+    
+    class TstClassMain(TstClassMainParent[Data1, Data2]):
+        pass
+    
+    v = from_dict(TstClassMain, param_1={"value":1}, param_2=dict(value="1"), param_3="s", param_4=1, fd_check_types=True)
+    assert isinstance(v.field_1, Data1)
+    assert isinstance(v.field_2, Data2)
+    assert isinstance(v.field_3, str)
+    assert isinstance(v.field_4, int)
+
 
 def test_generic_dataclass_with_generic_fields():
     TField1 = TypeVar('TField1')
@@ -414,3 +472,33 @@ def test_generic_dataclass_with_generic_fields():
     assert isinstance(v.f_1, Data2)
     assert isinstance(v.f_2, list)
     assert isinstance(v.f_2[0], Data1)
+
+
+def test_parent_generic_dataclass_with_generic_fields():
+    TField1 = TypeVar('TField1')
+    TField2 = TypeVar('TField2')
+    @dataclass(frozen=True)
+    class Data1:
+        value: int
+
+    @dataclass(frozen=True)
+    class Data2:
+        value: str
+
+    @dataclass(frozen=True)
+    class TstClassMainParent(Generic[TField1, TField2]):
+        f_1: Optional[TField1]
+        f_2: List[TField2]
+    
+    class TstClassMain(TstClassMainParent[Data1, Data2]):
+        pass
+    
+    v = from_dict(TstClassMain, {"f_1": {"value":1}, "f_2": [{"value":"1"}] }, fd_check_types=True)
+    assert isinstance(v.f_1, Data1)
+    assert isinstance(v.f_2, list)
+    assert isinstance(v.f_2[0], Data2)
+    
+    v = from_dict(TstClassMain, {"f_1": None, "f_2": [{"value":"1"}] }, fd_check_types=True)
+    assert v.f_1 is None
+    assert isinstance(v.f_2, list)
+    assert isinstance(v.f_2[0], Data2)
