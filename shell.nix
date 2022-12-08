@@ -5,6 +5,7 @@ let
     attrs
     pytest
     black
+    twine
   ]);
 in
 python-with-my-packages.env

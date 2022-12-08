@@ -1,5 +1,5 @@
 # Version 0.3.3 - 2022-11-27
-* Adding basic support for classes that inherit from 
+* Adding basic support for classes that inherit from
   classes that inherit from `Generic[...]`
 
 # Version 0.3.2 - 2022-11-13

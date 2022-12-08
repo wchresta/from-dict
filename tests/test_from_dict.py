@@ -176,7 +176,7 @@ def test_invalid_list_element_type():
 
     with pytest.raises(FromDictTypeError) as e:
         opt = from_dict(TstClass, a=11, b=None, c=[1, 2, 3, "bad"], d={"a":1, "b": 2}, fd_check_types=True)
-        
+
     assert str(e.value) == "For \"c[3]\", expected <class 'int'> but found <class 'str'>"
     assert not e.value.__suppress_context__
 
@@ -191,7 +191,7 @@ def test_invalid_dict_element_type():
 
     with pytest.raises(FromDictTypeError) as e:
         opt = from_dict(TstClass, a=11, b=None, c=[1, 2, 3, 4], d={"a":1, "b": 2, "C": "bad"}, fd_check_types=True)
-        
+
     assert str(e.value) == "For \"d['C']\", expected <class 'int'> but found <class 'str'>"
     assert not e.value.__suppress_context__
 
@@ -203,14 +203,14 @@ def test_invalid_list_element_type_in_subclass():
         b: Optional[str]
         c: List[int]
         d: Dict[str, int]
-        
+
     @dataclass(frozen=True)
     class TstClassMain:
         foo: TstClass
 
     with pytest.raises(FromDictTypeError) as e:
         opt = from_dict(TstClassMain, foo=dict(a=11, b=None, c=[1, 2, 3, "bad"], d={"a":1, "b": 2}), fd_check_types=True)
-        
+
     assert str(e.value) == "For \"foo.c[3]\", expected <class 'int'> but found <class 'str'>"
     assert e.value.__suppress_context__
 
@@ -222,14 +222,14 @@ def test_invalid_dict_element_type_in_subclass():
         b: Optional[str]
         c: List[int]
         d: Dict[str, int]
-        
+
     @dataclass(frozen=True)
     class TstClassMain:
         foo: TstClass
 
     with pytest.raises(FromDictTypeError) as e:
         opt = from_dict(TstClassMain, foo=dict(a=11, b=None, c=[1, 2, 3, 4], d={"a":1, "b": 2, "C": "bad"}), fd_check_types=True)
-        
+
     assert str(e.value) == "For \"foo.d['C']\", expected <class 'int'> but found <class 'str'>"
     assert e.value.__suppress_context__
 
@@ -265,9 +265,9 @@ def test_dataclass_generics_work():
     assert opt.b is None
     assert opt.c == [1, 2, 3]
     assert opt.d == {"a":1, "b": 2}
-    
+
     opt = from_dict(KDict, dict(a=11, b="hi", c=[1, 2, 3], d={"a":1, "b": 2}))
-    
+
     assert opt.a == 11
     assert opt.b == "hi"
     assert opt.c == [1, 2, 3]
@@ -335,13 +335,13 @@ def test_generic_dataclass():
         field_2: TField2
         field_3: str
         field_4: int
-        
+
     v = from_dict(TstClassMain[Data1, Data2], field_1=dict(value=1), field_2={"value":"1"}, field_3="s", field_4=1, fd_check_types=True)
     assert isinstance(v.field_1, Data1)
     assert isinstance(v.field_2, Data2)
     assert isinstance(v.field_3, str)
     assert isinstance(v.field_4, int)
-        
+
     v = from_dict(TstClassMain[Data2, Data1], field_1=dict(value="1"), field_2={"value":1}, field_3="s", field_4=1, fd_check_types=True)
     assert isinstance(v.field_1, Data2)
     assert isinstance(v.field_2, Data1)
@@ -370,7 +370,7 @@ def test_parent_generic_dataclass():
     @dataclass(frozen=True)
     class TstClassMain(TstClassMainParent[Data1, Data2]):
         pass
-        
+
     v = from_dict(TstClassMain, field_1=dict(value=1), field_2={"value":"1"}, field_3="s", field_4=1, fd_check_types=True)
     assert isinstance(v.field_1, Data1)
     assert isinstance(v.field_2, Data2)
@@ -395,13 +395,13 @@ def test_generic_norm_class():
             self.field_2 = param_2
             self.field_3 = param_3
             self.field_4 = param_4
-    
+
     v = from_dict(TstClassMain[Data1, Data2], param_1={"value":1}, param_2=dict(value="1"), param_3="s", param_4=1, fd_check_types=True)
     assert isinstance(v.field_1, Data1)
     assert isinstance(v.field_2, Data2)
     assert isinstance(v.field_3, str)
     assert isinstance(v.field_4, int)
-        
+
     v = from_dict(TstClassMain[Data2, Data1], param_1={"value":"1"}, param_2=dict(value=1), param_3="s", param_4=1, fd_check_types=True)
     assert isinstance(v.field_1, Data2)
     assert isinstance(v.field_2, Data1)
@@ -426,10 +426,10 @@ def test_parent_generic_norm_class():
             self.field_2 = param_2
             self.field_3 = param_3
             self.field_4 = param_4
-    
+
     class TstClassMain(TstClassMainParent[Data1, Data2]):
         pass
-    
+
     v = from_dict(TstClassMain, param_1={"value":1}, param_2=dict(value="1"), param_3="s", param_4=1, fd_check_types=True)
     assert isinstance(v.field_1, Data1)
     assert isinstance(v.field_2, Data2)
@@ -452,17 +452,17 @@ def test_generic_dataclass_with_generic_fields():
     class TstClassMain(Generic[TField1, TField2]):
         f_1: Optional[TField1]
         f_2: List[TField2]
-    
+
     v = from_dict(TstClassMain[Data1, Data2], {"f_1": {"value":1}, "f_2": [{"value":"1"}] }, fd_check_types=True)
     assert isinstance(v.f_1, Data1)
     assert isinstance(v.f_2, list)
     assert isinstance(v.f_2[0], Data2)
-    
+
     v = from_dict(TstClassMain[Data1, Data2], {"f_1": None, "f_2": [{"value":"1"}] }, fd_check_types=True)
     assert v.f_1 is None
     assert isinstance(v.f_2, list)
     assert isinstance(v.f_2[0], Data2)
-    
+
     v = from_dict(TstClassMain[Data2, Data1], {"f_1": {"value":"1"}, "f_2": [{"value":1}]}, fd_check_types=True)
     assert isinstance(v.f_1, Data2)
     assert isinstance(v.f_2, list)
@@ -489,15 +489,15 @@ def test_parent_generic_dataclass_with_generic_fields():
     class TstClassMainParent(Generic[TField1, TField2]):
         f_1: Optional[TField1]
         f_2: List[TField2]
-    
+
     class TstClassMain(TstClassMainParent[Data1, Data2]):
         pass
-    
+
     v = from_dict(TstClassMain, {"f_1": {"value":1}, "f_2": [{"value":"1"}] }, fd_check_types=True)
     assert isinstance(v.f_1, Data1)
     assert isinstance(v.f_2, list)
     assert isinstance(v.f_2[0], Data2)
-    
+
     v = from_dict(TstClassMain, {"f_1": None, "f_2": [{"value":"1"}] }, fd_check_types=True)
     assert v.f_1 is None
     assert isinstance(v.f_2, list)
