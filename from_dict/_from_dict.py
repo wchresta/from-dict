@@ -1,9 +1,10 @@
 import functools
 import sys
 import typing
+from collections import ChainMap
 from dataclasses import is_dataclass
 from typing import Any, Callable, Dict, ForwardRef, Mapping, Optional, Type
-from typing import TypeVar, Union
+from typing import TypeVar, Union, List
 
 PYTHON_VERSION = sys.version_info[:2]
 # Support for typing.get_args and typing.get_origin
@@ -23,6 +24,18 @@ class FromDictTypeError(TypeError):
 
     def __repr__(self):
         return f"FromDictTypeError({self.location!r}, {self.expected_type!r}, {self.found_type!r})"
+
+
+class FromDictUnknownArgsError(ValueError):
+    def __init__(self, unknown_args: List[str]):
+        self.unknown_args = unknown_args
+
+    def __str__(self):
+        names = ",".join((repr(a) for a in self.unknown_args))
+        return f"'fd_error_on_unknown' is set and the following extra arguments were supplied {names}"
+
+    def __repr__(self):
+        return f"FromDictUnknownArgsError({self.unknown_args!r})"
 
 
 class NamespaceTypes:
@@ -233,6 +246,7 @@ def from_dict(
     fd_copy_unknown: bool = True,
     fd_global_ns: Optional[dict] = None,
     fd_local_ns: Optional[dict] = None,
+    fd_error_on_unknown: bool = False,
     **overwrite_kwargs: Any,
 ) -> C:
     """Instantiate a class with parameters given by a dict.
@@ -251,9 +265,17 @@ def from_dict(
         have an effect if constructed object has a __dict__.
     :param fd_global_ns: global namespace to help with handling of forward references encoded as string literals
     :param fd_local_ns: local namespace to help with handling of forward references encoded as string literals
+    :param fd_error_on_unknown:
+        Should a 'FromDictUnknownArgsError' exception be raised if additional arguments are supplied that are not
+        used in constructor. If this is True, fd_copy_unknown has to be set to False
     :param overwrite_kwargs: All additional keys will overwrite whatever is given in the dictionary.
     :return: Object of cls constructed with keys extracted from fd_from.
     """
+    if fd_copy_unknown and fd_error_on_unknown:
+        raise ValueError(
+            "'fd_copy_unknown' and 'fd_error_on_unknown' can't both be true"
+        )
+
     ns_types = NamespaceTypes(fd_global_ns, fd_local_ns)
     given_args = {}
     if fd_from:
@@ -262,7 +284,9 @@ def from_dict(
         given_args.update(fd_from)
     if overwrite_kwargs:
         given_args.update(overwrite_kwargs)
-    return _from_dict_inner(cls, given_args, fd_check_types, fd_copy_unknown, ns_types)
+    return _from_dict_inner(
+        cls, given_args, fd_check_types, fd_copy_unknown, fd_error_on_unknown, ns_types
+    )
 
 
 def _from_dict_inner(
@@ -270,6 +294,7 @@ def _from_dict_inner(
     given_args: Union[dict, Any],
     fd_check_types: bool,
     fd_copy_unknown: bool,
+    fd_error_on_unknown: bool,
     ns_types: NamespaceTypes,
 ) -> C:
     if not isinstance(given_args, dict):
@@ -285,6 +310,7 @@ def _from_dict_inner(
         _from_dict_inner,
         fd_check_types=fd_check_types,
         fd_copy_unknown=fd_copy_unknown,
+        fd_error_on_unknown=fd_error_on_unknown,
         ns_types=ns_types,
     )
 
@@ -322,13 +348,19 @@ def _from_dict_inner(
 
     created_object = cls(**ckwargs)
 
-    # Check if created_object has a dictionary:
-    if fd_copy_unknown and given_args and hasattr(created_object, "__dict__"):
-        # Add the rest of the arguments to the dict, if possible.
-        # Do not overwrite existing keys
-        for arg, val in given_args.items():
-            if arg not in ckwargs and arg not in created_object.__dict__:
-                created_object.__dict__[arg] = val
+    if given_args and (fd_copy_unknown or fd_error_on_unknown):
+        created_object_dict = getattr(created_object, "__dict__", None)
+        known_args = ChainMap(ckwargs, created_object_dict or {})
+
+        # Check if created_object has a dictionary:
+        if fd_copy_unknown and created_object_dict is not None:
+            # Add the rest of the arguments to the dict, if possible.
+            # Do not overwrite existing keys
+            unknown_args = {k: v for k, v in given_args.items() if k not in known_args}
+            created_object.__dict__.update(unknown_args)
+        elif fd_error_on_unknown and set(given_args).difference(known_args):
+            unknown_args = [k for k in given_args if k not in known_args]
+            raise FromDictUnknownArgsError(unknown_args)
 
     return created_object
 
