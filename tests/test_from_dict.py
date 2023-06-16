@@ -3,7 +3,7 @@ from typing import Dict, List, NamedTuple, Optional, Type, Union, TypeVar, Gener
 
 import attr
 import pytest
-from from_dict import FromDictTypeError, from_dict
+from from_dict import FromDictTypeError, FromDictUnknownArgsError, from_dict
 
 
 @dataclass
@@ -502,3 +502,33 @@ def test_parent_generic_dataclass_with_generic_fields():
     assert v.f_1 is None
     assert isinstance(v.f_2, list)
     assert isinstance(v.f_2[0], Data2)
+
+def test_error_on_unknown_args():
+    # Verify these don't raise an error
+    from_dict(SubTestDictDataclass, foo=1, bar="s", fd_check_types=True)
+    from_dict(SubTestDictDataclass, foo=1, bar="s", fd_check_types=True, fd_error_on_unknown=True, fd_copy_unknown=False)
+    from_dict(SubTestDictDataclass, foo=1, bar="s", sam=1, fd_check_types=True)
+
+    with pytest.raises(FromDictUnknownArgsError) as e:
+        from_dict(SubTestDictDataclass, foo=1, bar="s", sam=1, fd_error_on_unknown=True, fd_copy_unknown=False, fd_check_types=True)
+    
+    # Verify these don't raise an error
+    from_dict(MainTestDictDataclass, foo=1, baz=dict(foo=1, bar="s"), fd_check_types=True)
+    from_dict(MainTestDictDataclass, foo=1, baz=dict(foo=1, bar="s"), fd_check_types=True, fd_error_on_unknown=True, fd_copy_unknown=False)
+    from_dict(MainTestDictDataclass, foo=1, baz=dict(foo=5, bar="s", sam=2), fd_check_types=True)
+
+    with pytest.raises(FromDictUnknownArgsError) as e:
+        from_dict(MainTestDictDataclass, foo=1, baz=dict(foo=5, bar="s", sam=2), fd_error_on_unknown=True, fd_copy_unknown=False, fd_check_types=True)
+    
+    @dataclass
+    class ClassWithDefaults:
+        foo: int = 1
+        bar: str = "default"
+          
+    # Verify these don't raise an error
+    from_dict(ClassWithDefaults, foo=3, fd_check_types=True)
+    from_dict(ClassWithDefaults, fd_check_types=True, fd_error_on_unknown=True, fd_copy_unknown=False)
+    from_dict(ClassWithDefaults, sam=1, fd_check_types=True)
+
+    with pytest.raises(FromDictUnknownArgsError) as e:
+        from_dict(ClassWithDefaults, sam=1, fd_error_on_unknown=True, fd_copy_unknown=False, fd_check_types=True)
