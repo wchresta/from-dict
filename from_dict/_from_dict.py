@@ -4,7 +4,7 @@ import typing
 from collections import ChainMap
 from dataclasses import is_dataclass
 from typing import Any, Callable, Dict, ForwardRef, Mapping, Optional, Type
-from typing import TypeVar, Union
+from typing import TypeVar, Union, List
 
 PYTHON_VERSION = sys.version_info[:2]
 # Support for typing.get_args and typing.get_origin
@@ -27,7 +27,7 @@ class FromDictTypeError(TypeError):
 
 
 class FromDictUnknownArgsError(ValueError):
-    def __init__(self, unknown_args: Dict[str, Any]):
+    def __init__(self, unknown_args: List[str]):
         self.unknown_args = unknown_args
 
     def __str__(self):
@@ -359,7 +359,7 @@ def _from_dict_inner(
             unknown_args = {k: v for k, v in given_args.items() if k not in known_args}
             created_object.__dict__.update(unknown_args)
         elif fd_error_on_unknown and set(given_args).difference(known_args):
-            unknown_args = {k: v for k, v in given_args.items() if k not in known_args}
+            unknown_args = [k for k in given_args if k not in known_args]
             raise FromDictUnknownArgsError(unknown_args)
 
     return created_object
