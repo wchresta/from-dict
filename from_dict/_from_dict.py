@@ -2,7 +2,7 @@ import functools
 import sys
 import typing
 from dataclasses import is_dataclass
-from typing import Any, Callable, Dict, ForwardRef, Mapping, Optional, Type
+from typing import Any, Callable, Dict, ForwardRef, Mapping, Optional, Type, Literal
 from typing import TypeVar, Union
 
 PYTHON_VERSION = sys.version_info[:2]
@@ -108,6 +108,10 @@ def type_check(check_stack: list, v: Any, t: type) -> None:
             except FromDictTypeError:
                 pass
         raise FromDictTypeError(location(), t, type(v))
+    if origin == Literal:
+        if any(a == v for a in type_args):
+            return  # Successfully type checked
+        raise FromDictTypeError(location(), f"literal value(s) {type_args}", repr(v))
 
     if not isinstance(v, origin):  # list ~ List[x], dict ~ Dict[x,y]
         raise FromDictTypeError(location(), t, type(v))
@@ -424,6 +428,8 @@ def handle_dict_argument(
                     )
                     for k, v in given_argument.items()
                 }
+            if value_type_origin is Literal:
+                return given_argument
 
         # Any object that has type-hints in the constructor
         if _get_constructor_type_hints(value_type):
@@ -501,7 +507,7 @@ def handle_list_argument(
                     for element in given_argument
                 ]
 
-            if get_origin(element_type) is Union:
+            if element_type_origin is Union:
                 return [
                     _handle_union(
                         _get_constructor_type_hints,
@@ -512,6 +518,8 @@ def handle_list_argument(
                     )
                     for v in given_argument
                 ]
+            if element_type_origin is Literal:
+                return given_argument
 
         # Any object that has type-hints in the constructor
         if _get_constructor_type_hints(element_type):

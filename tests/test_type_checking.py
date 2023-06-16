@@ -2,7 +2,7 @@ import copy
 import datetime
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional, Union, Type, Callable, TypeVar, Generic
+from typing import Any, Dict, List, Optional, Union, Type, Callable, TypeVar, Generic, Literal
 
 from from_dict import FromDictTypeError, from_dict
 
@@ -62,6 +62,8 @@ ClassNormalClass = ClassBase[NormalClass, "ClassNormalClass"]
 ClassAttrClass = ClassBase[AttrClass, "ClassAttrClass"]
 ClassListDataClass = ClassBase[List[DataClass], "ClassListDataClass"]
 ClassDictDataClass = ClassBase[Dict[str, DataClass], "ClassDictDataClass"]
+ClassLiteral = ClassBase[Literal["my-literal"], "ClassLiteral"]
+ClassMultiLiteral = ClassBase[Literal[2, 3, 5, 7, 11], "ClassMultiLiteral"]
 
 # . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .
 # helper functions
@@ -119,6 +121,10 @@ class NormTestParams:
 
     pytest.param(NormTestParams(ClassListDataClass, lambda: [{"field": "value"}], lambda: [DataClass("value")]), id="list-data-class"),
     pytest.param(NormTestParams(ClassDictDataClass, lambda: {"KEY":{"field": "value"}}, lambda: {"KEY":DataClass("value")}), id="dict-data-class"),
+
+    pytest.param(NormTestParams(ClassLiteral, lambda: "my-literal", lambda: "my-literal"), id="literal-single"),
+    pytest.param(NormTestParams(ClassMultiLiteral, lambda: 3, lambda: 3), id="literal-multi-1"),
+    pytest.param(NormTestParams(ClassMultiLiteral, lambda: 11, lambda: 11), id="literal-multi-2"),
 ])
 def norm_params(request):
     yield request.param
@@ -142,6 +148,10 @@ class NegativeTestParams:
     
     pytest.param(NegativeTestParams(ClassListDataClass, lambda: [{"field": "value"}], datetime.datetime.now), id="list-data-class"),
     pytest.param(NegativeTestParams(ClassDictDataClass, lambda: {"KEY":{"field": "value"}}, datetime.datetime.now), id="dict-data-class"),
+
+    pytest.param(NegativeTestParams(ClassLiteral, lambda: "my-literal", lambda: 1), id="literal-single"),
+    pytest.param(NegativeTestParams(ClassMultiLiteral, lambda: 3, lambda: 1), id="literal-multi-1"),
+    pytest.param(NegativeTestParams(ClassMultiLiteral, lambda: 5, lambda: 10), id="literal-multi-2"),
 ])
 def negative_params(request):
     yield request.param
