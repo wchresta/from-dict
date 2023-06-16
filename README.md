@@ -7,6 +7,8 @@ Create data structures from partially known dictionaries.
 * Insert additional fields existing in dict into structure with `fd_copy_unknown=True`
 * Optional run-time type-checking with `fd_check_types=True`
 * Supports forward references
+* Raise an exception if there are more arguments supplied than are required with `fd_error_on_unknown=True`
+* Supports Literal type hints
 
 
 ## Example

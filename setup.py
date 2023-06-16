@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setup(
     name="from-dict",
-    version="0.3.3",
+    version="0.4.0",
     packages=find_packages(),
     author="Wanja Chresta",
     author_email="wanja.hs@chrummibei.ch",

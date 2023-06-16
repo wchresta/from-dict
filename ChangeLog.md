@@ -1,3 +1,8 @@
+# Version 0.4.0 - 2023-06-16
+* Adding basic support for Literal type hints
+* Adding `fd_error_on_unknown` argument
+* Drop support for 3.7
+
 # Version 0.3.3 - 2022-11-27
 * Adding basic support for classes that inherit from
   classes that inherit from `Generic[...]`
