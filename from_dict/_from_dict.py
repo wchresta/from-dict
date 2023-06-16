@@ -4,11 +4,9 @@ import typing
 from collections import ChainMap
 from dataclasses import is_dataclass
 from typing import Any, Callable, Dict, ForwardRef, Mapping, Optional, Type, Literal
-from typing import TypeVar, Union, List
+from typing import TypeVar, Union, List, get_args, get_origin
 
 PYTHON_VERSION = sys.version_info[:2]
-# Support for typing.get_args and typing.get_origin
-IS_GE_PYTHON38 = PYTHON_VERSION >= (3, 8)
 IS_GE_PYTHON39 = PYTHON_VERSION >= (3, 9)
 C = TypeVar("C")
 
@@ -74,23 +72,6 @@ class NamespaceTypes:
             and self._global_types == o._global_types
             and self._local_types == o._local_types
         )
-
-
-if IS_GE_PYTHON38:
-    from typing import get_args, get_origin
-else:
-
-    def get_origin(tp) -> Optional[type]:
-        if hasattr(tp, "__origin__"):
-            return tp.__origin__
-        else:
-            return None
-
-    def get_args(tp) -> tuple:
-        if hasattr(tp, "__args__"):
-            return tp.__args__
-        else:
-            return ()
 
 
 def type_check(check_stack: list, v: Any, t: type) -> None:
