@@ -82,6 +82,7 @@ else:
 
 def type_check(check_stack: list, v: Any, t: type) -> None:
     """Raise FromDictTypeError if given value does not agree with given type"""
+
     # This uses typing.get_args and typing.get_origin
     def location():
         return ["".join(check_stack)]
