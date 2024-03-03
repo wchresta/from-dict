@@ -203,7 +203,7 @@ def test_self_ref(norm_params: NormTestParams):
 
 
 def test_union(norm_params: NormTestParams):
-    data = initialize(dict, norm_params.dic_init_func)
+    data: dict = initialize(dict, norm_params.dic_init_func)
     obj = from_dict(norm_params.cls, data, fd_check_types=True)
     
     expected = initialize(norm_params.cls, norm_params.expected_init_func, norm_params.dic_init_func)
@@ -246,7 +246,7 @@ def test_union(norm_params: NormTestParams):
 
 
 def test_list_union(norm_params: NormTestParams):
-    data = initialize(dict, norm_params.dic_init_func)
+    data: dict = initialize(dict, norm_params.dic_init_func)
     obj = from_dict(norm_params.cls, data, fd_check_types=True)
     
     expected = initialize(norm_params.cls, norm_params.expected_init_func, norm_params.dic_init_func)
@@ -375,7 +375,7 @@ def test_negative_list(negative_params: NegativeTestParams):
 
 
 def test_negative_dict(negative_params: NegativeTestParams):
-    data = initialize(dict, negative_params.dic_init_func)
+    data: dict = initialize(dict, negative_params.dic_init_func)
     data["dict_normal"] = {"k":negative_params.bad_init_func()}
 
     with expect_type_error():
