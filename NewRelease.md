@@ -4,8 +4,9 @@
 $ nix develop
 $ rm dist/*
 $ python3 setup.py sdist bdist_wheel
-$ python -m twine upload --repository-url https://test.pypi.org/legacy/ dist/*
+$ # Ensure ~/.pypirc is set up correctly
+$ python -m twine upload --repository from-dict-test dist/*
 $ # Inspect package
-$ python -m twine upload dist/*
+$ python -m twine upload --repository from-dict dist/*
 ```
 
