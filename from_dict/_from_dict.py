@@ -156,7 +156,7 @@ def _resolve_generic_class(
     Swap out the generic parameters with the type args.
     """
 
-    def resolve_generic_arg(arg_cls: Type, swaps: Dict[str, str]):
+    def resolve_generic_arg(arg_cls: Type, swaps: Mapping[str, Type]):
         # A generic type definition inside the generic class
         arg_args = list(get_args(arg_cls))
         for i, arg in enumerate(arg_args):
@@ -397,7 +397,7 @@ def handle_dict_argument(
 
     # Common case: The expected type is a dataclass or attr
     if is_dataclass(cls_argument_type) or is_attr(cls_argument_type):
-        return _from_dict(cls_argument_type, given_argument)
+        return _from_dict(cls_argument_type, given_argument)  # type: ignore
 
     cls_argument_origin = get_origin(cls_argument_type)
 
@@ -576,8 +576,8 @@ def _handle_union(
                     get_args(arg_type),
                     given_argument,
                 )
-            required_keys = _get_constructor_type_hints(arg_type)
-            if all(k in required_keys for k in given_argument):
+            constructor_param_names = _get_constructor_type_hints(arg_type)
+            if not any(k not in constructor_param_names for k in given_argument):
                 try:
                     return _from_dict(arg_type, given_argument)
                 except TypeError:
