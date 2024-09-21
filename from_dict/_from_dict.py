@@ -177,12 +177,15 @@ def _resolve_generic_class(
     if origin is None and hasattr(cls, "__orig_bases__"):
         # Only support the inherit from a generic class if it is
         # the first class in the mro.
+        init_method = cls.__init__
         cls = cls.__orig_bases__[0]
         origin = get_origin(cls)
+    else:
+        init_method = origin.__init__
     args = [resolve_str_forward_ref(a, cls, ns_types) for a in get_args(cls)]
     swaps = dict(zip(getattr(origin, "__parameters__"), args))
     hints = typing.get_type_hints(
-        origin.__init__, ns_types.global_types, ns_types.local_types
+        init_method, ns_types.global_types, ns_types.local_types
     ) or typing.get_type_hints(origin, ns_types.global_types, ns_types.local_types)
     for k, v in hints.items():
         if v in swaps:
