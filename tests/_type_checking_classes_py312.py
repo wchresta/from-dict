@@ -5,6 +5,14 @@ from typing import Any, Optional, Literal
 from _type_checking_classes import DataClass, NormalClass, AttrClass
 
 @dataclass
+class GenericDataClass[T]:
+    field: T
+
+@dataclass
+class GenericDataClassSubClass(GenericDataClass[str]):
+    another: int
+
+@dataclass
 class ClassBase[TTestType, TSelfRef]:
     normal: TTestType
     optional: Optional[TTestType]
@@ -36,3 +44,6 @@ ClassListDataClass = ClassBase[list[DataClass], "ClassListDataClass"]
 ClassDictDataClass = ClassBase[dict[str, DataClass], "ClassDictDataClass"]
 ClassLiteral = ClassBase[Literal["my-literal"], "ClassLiteral"]
 ClassMultiLiteral = ClassBase[Literal[2, 3, 5, 7, 11], "ClassMultiLiteral"]
+
+ClassGenericDataClassINT = ClassBase[GenericDataClass[int], "ClassGenericDataClassINT"]
+ClassGenericDataClassSubClass = ClassBase[GenericDataClassSubClass, "ClassGenericDataClassSubClass"]
