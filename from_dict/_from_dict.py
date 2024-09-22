@@ -355,8 +355,8 @@ def _from_dict_inner(
 
 def handle_item(
     _get_constructor_type_hints: Callable[[Type], Mapping[str, Type]],
-    _resolve_str_forward_ref,
-    _from_dict: Callable[[Type[C], dict], C],
+    _resolve_str_forward_ref: Callable[[Union[str, Type]], Type],
+    _from_dict: Callable[[Type, dict], Any],
     cls_argument_type: Type,
     given_argument: Any,
 ):
@@ -386,12 +386,12 @@ def handle_item(
 
 def handle_dict_argument(
     _get_constructor_type_hints: Callable[[Type], Mapping[str, Type]],
-    _resolve_str_forward_ref,
-    _from_dict: Callable[[Type[C], dict], C],
+    _resolve_str_forward_ref: Callable[[Union[str, Type]], Type],
+    _from_dict: Callable[[Type, dict], Any],
     cls_argument_type: Type,
     cls_arg_type_args: tuple,
     given_argument: dict,
-) -> object:
+):
     """This is called when the given argument is an instance of 'dict'"""
 
     # Empty dictionary. Does not matter what the items are.
@@ -481,12 +481,12 @@ def handle_dict_argument(
 
 def handle_list_argument(
     _get_constructor_type_hints: Callable[[Type], Mapping[str, Type]],
-    _resolve_str_forward_ref,
-    _from_dict: Callable[[Type[C], dict], C],
+    _resolve_str_forward_ref: Callable[[Union[str, Type]], Type],
+    _from_dict: Callable[[Type, dict], Any],
     cls_argument_type: Type,
     cls_arg_type_args: tuple,
     given_argument: list,
-) -> object:
+):
     """This is called when the given argument is an instance of 'list'"""
 
     # Empty list. Does not matter what the elements are.
@@ -560,8 +560,8 @@ def handle_list_argument(
 
 def _handle_union(
     _get_constructor_type_hints: Callable[[Type], Mapping[str, Type]],
-    _resolve_str_forward_ref,
-    _from_dict: Callable[[Type[C], dict], C],
+    _resolve_str_forward_ref: Callable[[Union[str, Type]], Type],
+    _from_dict: Callable[[Type, dict], Any],
     cls_argument_type: Type,
     given_argument: Any,
 ):
