@@ -1,3 +1,10 @@
+# Version 0.4.2 - 2024-09-21
+* Bug fix for generic classes
+
+# Version 0.4.1 - 2014-03-07
+* Officially supporting Python 3.12
+* Fixing bug with unions and data-classes that have default values
+  
 # Version 0.4.0 - 2023-06-16
 * Adding basic support for Literal type hints
 * Adding `fd_error_on_unknown` argument
