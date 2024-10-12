@@ -15,18 +15,22 @@ import pytest
 if sys.version_info[0:1] < (3, 12):
     from _type_checking_classes import (
         NormalClass, DataClass, AttrClass,
+        GenericDataClass, GenericDataClassSubClass,
         ClassPrimitives, ClassDict, ClassDictSimple,
         ClassList, ClassDataClass, ClassNormalClass,
         ClassAttrClass, ClassListDataClass, ClassDictDataClass,
-        ClassLiteral, ClassMultiLiteral
+        ClassLiteral, ClassMultiLiteral,
+        ClassGenericDataClassINT, ClassGenericDataClassSubClass
     )
 else:
     from _type_checking_classes_py312 import (
         NormalClass, DataClass, AttrClass,
+        GenericDataClass, GenericDataClassSubClass,
         ClassPrimitives, ClassDict, ClassDictSimple,
         ClassList, ClassDataClass, ClassNormalClass,
         ClassAttrClass, ClassListDataClass, ClassDictDataClass,
-        ClassLiteral, ClassMultiLiteral
+        ClassLiteral, ClassMultiLiteral,
+        ClassGenericDataClassINT, ClassGenericDataClassSubClass
     )
 
 
@@ -90,6 +94,9 @@ class NormTestParams:
     pytest.param(NormTestParams(ClassLiteral, lambda: "my-literal", lambda: "my-literal"), id="literal-single"),
     pytest.param(NormTestParams(ClassMultiLiteral, lambda: 3, lambda: 3), id="literal-multi-1"),
     pytest.param(NormTestParams(ClassMultiLiteral, lambda: 11, lambda: 11), id="literal-multi-2"),
+
+    pytest.param(NormTestParams(ClassGenericDataClassINT, lambda: {"field": 1}, lambda: GenericDataClass[int](1)), id="generic-init"),
+    pytest.param(NormTestParams(ClassGenericDataClassSubClass, lambda: {"field": "1", "another": 2}, lambda: GenericDataClassSubClass("1", 2)), id="generic-sub"),
 ])
 def norm_params(request):
     yield request.param
@@ -117,6 +124,9 @@ class NegativeTestParams:
     pytest.param(NegativeTestParams(ClassLiteral, lambda: "my-literal", lambda: 1), id="literal-single"),
     pytest.param(NegativeTestParams(ClassMultiLiteral, lambda: 3, lambda: 1), id="literal-multi-1"),
     pytest.param(NegativeTestParams(ClassMultiLiteral, lambda: 5, lambda: 10), id="literal-multi-2"),
+    
+    pytest.param(NegativeTestParams(ClassGenericDataClassINT, lambda: {"field": 1}, lambda: 1), id="generic-init"),
+    pytest.param(NegativeTestParams(ClassGenericDataClassSubClass, lambda: {"field": "1", "another": 2}, lambda: 2), id="generic-sub"),
 ])
 def negative_params(request):
     yield request.param

@@ -23,6 +23,16 @@ class DataClass:
 class AttrClass:
     attrib: str
 
+
+T = TypeVar("T")
+@dataclass
+class GenericDataClass(Generic[T]):
+    field: T
+
+@dataclass
+class GenericDataClassSubClass(GenericDataClass[str]):
+    another: int
+
 TTestType = TypeVar("TTestType")
 TSelfRef = TypeVar("TSelfRef")
 
@@ -58,3 +68,6 @@ ClassListDataClass = ClassBase[List[DataClass], "ClassListDataClass"]
 ClassDictDataClass = ClassBase[Dict[str, DataClass], "ClassDictDataClass"]
 ClassLiteral = ClassBase[Literal["my-literal"], "ClassLiteral"]
 ClassMultiLiteral = ClassBase[Literal[2, 3, 5, 7, 11], "ClassMultiLiteral"]
+
+ClassGenericDataClassINT = ClassBase[GenericDataClass[int], "ClassGenericDataClassINT"]
+ClassGenericDataClassSubClass = ClassBase[GenericDataClassSubClass, "ClassGenericDataClassSubClass"]

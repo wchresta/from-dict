@@ -377,6 +377,17 @@ def test_parent_generic_dataclass():
     assert isinstance(v.field_3, str)
     assert isinstance(v.field_4, int)
 
+    @dataclass(frozen=True)
+    class TstClassMain2(TstClassMainParent[Data1, Data2]):
+        field_5: int
+
+    v = from_dict(TstClassMain2, field_1=dict(value=1), field_2={"value":"1"}, field_3="s", field_4=1, field_5=3, fd_check_types=True)
+    assert isinstance(v.field_1, Data1)
+    assert isinstance(v.field_2, Data2)
+    assert isinstance(v.field_3, str)
+    assert isinstance(v.field_4, int)
+    assert isinstance(v.field_5, int)
+
 
 def test_generic_norm_class():
     TParam1 = TypeVar('TParam1')
