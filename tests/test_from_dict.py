@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Dict, List, NamedTuple, Optional, Type, Union, TypeVar, Generic
+from typing import Dict, List, NamedTuple, Optional, Type, Union, TypeVar, Generic, Any
 
 import attr
 import pytest
@@ -543,3 +543,30 @@ def test_error_on_unknown_args():
 
     with pytest.raises(FromDictUnknownArgsError) as e:
         from_dict(ClassWithDefaults, sam=1, fd_error_on_unknown=True, fd_copy_unknown=False, fd_check_types=True)
+
+
+def test_any():
+    @dataclass
+    class Data:
+        value: Any
+    
+    assert from_dict(Data, value=0).value == 0
+    assert from_dict(Data, value=None).value == None
+    assert from_dict(Data, value="ANYTHING").value == "ANYTHING"
+    assert from_dict(Data, value=3, fd_check_types=True).value == 3
+    assert from_dict(Data, value=None, fd_check_types=True)
+    assert from_dict(Data, value="ANYTHING", fd_check_types=True)
+
+def test_optional_any():
+    @dataclass
+    class Data:
+        value: Optional[Any]
+    
+    assert from_dict(Data, value=0).value == 0
+    assert from_dict(Data, value=None).value == None
+    assert from_dict(Data, value="ANYTHING").value == "ANYTHING"
+    assert from_dict(Data, value=3, fd_check_types=True).value == 3
+    assert from_dict(Data, value=None, fd_check_types=True)
+    assert from_dict(Data, value="ANYTHING", fd_check_types=True)
+
+    

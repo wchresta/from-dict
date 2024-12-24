@@ -82,7 +82,12 @@ def type_check(check_stack: list, v: Any, t: type) -> None:
         return ["".join(check_stack)]
 
     try:
-        passed_isinstance = isinstance(v, t)
+        # isinstance() always returns false when `Optional[Any]` is the type
+        # https://github.com/python/cpython/issues/128232
+        if t is Optional[Any]:
+            passed_isinstance = True
+        else:
+            passed_isinstance = isinstance(v, t)
     except TypeError:  # Could happen if t is of sort List[x], etc.
         passed_isinstance = True
 
