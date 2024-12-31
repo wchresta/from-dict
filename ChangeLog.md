@@ -1,3 +1,6 @@
+# Version 0.4.3 - 2024-12-24
+* Fixing issue with `Optional[Any]`
+
 # Version 0.4.2 - 2024-09-21
 * Bug fix for generic classes
 
